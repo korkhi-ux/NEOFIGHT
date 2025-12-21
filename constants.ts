@@ -3,7 +3,7 @@ import { FighterClass } from './types';
 
 export const CANVAS_WIDTH = 1280; // Viewport Width
 export const CANVAS_HEIGHT = 720;
-export const WORLD_WIDTH = 4000; // Expanded Map for Slinger Gameplay
+export const WORLD_WIDTH = 4000; // XXL Map for tactical spacing
 export const GROUND_Y = 600;
 
 // Base Physics Constants (Used as default for STANDARD class)
@@ -43,16 +43,16 @@ export const CLASS_STATS: Record<FighterClass, ClassStats> = {
         damageMult: 1.0,
         gravityScale: 1.0
     },
-    SLINGER: { // Faster, weaker, high mobility
+    SLINGER: { // High Mobility, Standard Physics (Rebalanced)
         speed: PLAYER_SPEED * 1.2,
         maxSpeed: MAX_SPEED * 1.3,
-        jumpForce: JUMP_FORCE * 1.0,
+        jumpForce: JUMP_FORCE, // Standardized Jump
         dashSpeed: DASH_SPEED * 1.1,
         dashDuration: DASH_DURATION * 0.8,
         dashCooldown: DASH_COOLDOWN * 0.7,
         health: 80,
         damageMult: 0.8,
-        gravityScale: 0.85 // Floaty
+        gravityScale: 1.0 // Standardized Gravity (No longer floaty)
     },
     VORTEX: { // Floaty, tech-based
         speed: PLAYER_SPEED * 1.0,
@@ -98,16 +98,17 @@ export const PLAYER_HEIGHT = 100;
 // Visuals
 export const TRAIL_LENGTH = 3; // Shortened trails
 export const MAX_ZOOM = 1.35; 
-export const MIN_ZOOM = 0.85; 
+export const MIN_ZOOM = 0.75; // Allow zooming out more for the large map
 
 // Camera Dynamics
-export const CAMERA_SMOOTHING = 0.12; // Increased for more stability (less floaty)
+export const CAMERA_SMOOTHING = 0.12; 
 export const CAMERA_LOOKAHEAD = 150;
-export const CAMERA_TILT_MAX = 0.015; // Reduced tilt by half for clarity
+export const CAMERA_TILT_MAX = 0.015;
 
 // Slinger Mechanics
 export const GRAPPLE_COOLDOWN = 60; // Frames
-export const GRAPPLE_MAX_SPEED = 28; // Cap speed to prevent physics explosion
+export const GRAPPLE_MAX_SPEED = 32; 
+export const GRAPPLE_RANGE = 1200; 
 
 export const COLORS = {
   player: {

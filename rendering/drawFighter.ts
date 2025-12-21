@@ -8,31 +8,25 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
         const startY = f.y + f.height/2;
         const endX = f.grapplePoint.x;
         const endY = f.grapplePoint.y;
+        
+        const isEnemyHook = f.grappleTargetId !== null;
 
         ctx.save();
         
-        // Calculate tension visually
-        const dist = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
-        const tensionRatio = Math.min(dist / 400, 1);
-        
-        // Taut Rope: Thinner and darker
-        // Loose Rope: Thicker and brighter
-        const width = 4 - (tensionRatio * 2); 
-        ctx.lineWidth = width;
-        
-        // Color interpolation hack (Bright to Darker Green)
-        ctx.strokeStyle = tensionRatio > 0.8 ? '#4ade80' : f.color.glow;
-        
-        ctx.shadowBlur = 10 * (1 - tensionRatio); // Glow reduces as it stretches
-        ctx.shadowColor = f.color.primary;
+        // High Intensity color if hooked to enemy
+        ctx.strokeStyle = isEnemyHook ? '#ffff00' : f.color.glow;
+        ctx.lineWidth = isEnemyHook ? 4 : 3;
+        ctx.shadowBlur = isEnemyHook ? 20 : 10;
+        ctx.shadowColor = isEnemyHook ? '#ffff00' : f.color.primary;
         
         ctx.beginPath();
         ctx.moveTo(startX, startY);
         
         // Vibrating Rope Effect
+        const dist = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
         const segments = 10;
-        // Vibration reduces as tension increases
-        const vibration = Math.sin(gameState.frameCount * 0.8) * 5 * (1 - tensionRatio); 
+        // More vibration if enemy hooked (tension)
+        const vibration = Math.sin(gameState.frameCount * 0.8) * (isEnemyHook ? 8 : 4); 
         
         for (let i = 1; i < segments; i++) {
             const t = i / segments;
@@ -56,9 +50,9 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
         ctx.stroke();
         
         // Anchor Dot
-        ctx.fillStyle = '#fff';
+        ctx.fillStyle = isEnemyHook ? '#ffff00' : '#fff';
         ctx.beginPath();
-        ctx.arc(endX, endY, 4, 0, Math.PI*2);
+        ctx.arc(endX, endY, isEnemyHook ? 6 : 4, 0, Math.PI*2);
         ctx.fill();
         ctx.restore();
     }

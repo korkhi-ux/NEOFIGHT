@@ -101,11 +101,12 @@ export interface Fighter {
   isAttacking: boolean;
   isDead: boolean;
 
-  // Class Specific Mechanics (Future Proofing)
-  specialPowerCharge: number; // 0 to 100
+  // Class Specific Mechanics
+  specialPowerCharge: number; 
   isGrappling?: boolean;
   grapplePoint?: Vector | null;
-  grappleCooldown: number; // New: Prevents spam
+  grappleTargetId?: string | null; // ID of the entity we are hooked to
+  grappleCooldownTimer: number; 
 
   // Previous Frame State (for friction/landing particles)
   prevVx: number;

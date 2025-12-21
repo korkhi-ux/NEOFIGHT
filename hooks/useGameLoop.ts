@@ -37,7 +37,8 @@ const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClas
     specialPowerCharge: 0,
     isGrappling: false,
     grapplePoint: null,
-    grappleCooldown: 0,
+    grappleTargetId: null,
+    grappleCooldownTimer: 0,
     
     aiState: id === 'enemy' ? {
         mode: 'neutral', 
@@ -197,7 +198,7 @@ export const useGameLoop = (
             inputManager.current.unmount();
             audioManager.current?.suspend();
         };
-    }, [gameActive, onGameOver, playerClass]); // dependency on playerClass
+    }, [gameActive, onGameOver, playerClass]); 
 
     return gameState;
 };
