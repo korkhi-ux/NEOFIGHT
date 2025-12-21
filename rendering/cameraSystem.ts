@@ -18,8 +18,14 @@ export const updateCamera = (gameState: GameState, viewportWidth: number, viewpo
     gameState.cameraLookAhead += (lookAheadTarget - gameState.cameraLookAhead) * 0.05;
 
     // Dynamic Tilt
-    const targetTilt = (player.vx / MAX_SPEED) * CAMERA_TILT_MAX;
-    gameState.cameraTilt += (targetTilt - gameState.cameraTilt) * 0.1;
+    // If speed is very low, snap target to 0
+    const targetTilt = (Math.abs(player.vx) < 1.0) 
+        ? 0 
+        : (player.vx / MAX_SPEED) * CAMERA_TILT_MAX;
+        
+    // Faster return to 0 (0.2) than tilt accumulation (0.1)
+    const tiltSmoothing = Math.abs(player.vx) < 1.0 ? 0.2 : 0.1;
+    gameState.cameraTilt += (targetTilt - gameState.cameraTilt) * tiltSmoothing;
 
     const viewW = viewportWidth / zoom;
     const viewH = viewportHeight / zoom;

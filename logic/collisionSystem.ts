@@ -64,7 +64,7 @@ const handleHit = (
     createImpact(gameState, impactX, impactY, '#ffffff');
 
     if (attacker.comboCount === 2) {
-        gameState.chromaticAberration = 15;
+        gameState.chromaticAberration = 8; // Reduced noise (was 15)
         gameState.shake = 30;
         createFlare(gameState, impactX, impactY, attacker.color.glow); 
     } else {

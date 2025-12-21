@@ -37,10 +37,13 @@ export const updateFighter = (
     if (f.isGrounded && justChangedDir) {
         createParticles(gameState, f.x + f.width/2, f.y + f.height, 5, f.color.glow, 4);
     }
+    
+    // Directive 4: Accentuate Jiggle on Landing
     if (justLanded) {
         createParticles(gameState, f.x + f.width/2, f.y + f.height, 8, '#ffffff', 3);
-        f.scaleX = 1.4; 
-        f.scaleY = 0.6;
+        // More extreme squash (was 1.4/0.6)
+        f.scaleX = 1.5; 
+        f.scaleY = 0.5; 
     }
 
     // --- Timers ---
@@ -63,12 +66,12 @@ export const updateFighter = (
             scaleY: f.scaleY,
             rotation: f.rotation,
             facing: f.facing,
-            alpha: 0.5,
+            alpha: 0.3, 
             color: f.color.glow
         });
     }
     for (let i = f.trail.length - 1; i >= 0; i--) {
-        f.trail[i].alpha -= 0.08 * timeScale;
+        f.trail[i].alpha -= 0.1 * timeScale;
         if (f.trail[i].alpha <= 0) f.trail.splice(i, 1);
     }
 
@@ -89,8 +92,9 @@ export const updateFighter = (
       const dashDir = input.x !== 0 ? Math.sign(input.x) : f.facing;
       f.facing = dashDir as 1 | -1;
       
-      f.scaleX = 1.6;
-      f.scaleY = 0.5;
+      // Extreme Stretch for Dash (Directive 4)
+      f.scaleX = 1.7; // Was 1.6
+      f.scaleY = 0.4; // Was 0.5
       gameState.shake += 2;
     }
 
@@ -102,6 +106,7 @@ export const updateFighter = (
        }
        f.vy = JUMP_FORCE;
        f.isGrounded = false;
+       // Stretch Up
        f.scaleX = 0.6;
        f.scaleY = 1.5;
        createParticles(gameState, f.x + f.width/2, f.y + f.height, 5, '#fff', 3);
@@ -202,13 +207,22 @@ export const updateFighter = (
       f.facing = Math.sign(input.x) as 1 | -1;
     }
 
-    // Animation Spring
-    f.scaleX += (1 - f.scaleX) * 0.2 * timeScale;
-    f.scaleY += (1 - f.scaleY) * 0.2 * timeScale;
+    // Animation Spring (Jiggle Dynamics)
+    // Slower return (0.15 instead of 0.2) to make the wobble visible longer
+    f.scaleX += (1 - f.scaleX) * 0.15 * timeScale;
+    f.scaleY += (1 - f.scaleY) * 0.15 * timeScale;
 
-    const targetRot = (f.vx / MAX_SPEED) * 0.2; 
-    f.rotation += (targetRot - f.rotation) * 0.2 * timeScale;
+    // Lean / Rotation Logic
+    if (Math.abs(f.vx) < 1.0) {
+        // Fast reset to 0 when stopped
+        f.rotation *= 0.7; 
+    } else {
+        // Lean proportional to speed
+        const targetRot = (f.vx / MAX_SPEED) * 0.25; 
+        f.rotation += (targetRot - f.rotation) * 0.2 * timeScale;
+    }
     
+    // Run Bounce
     if (Math.abs(f.vx) > 1 && f.isGrounded) {
         f.scaleY = 1 + Math.sin(gameState.frameCount * 0.5) * 0.05;
         f.scaleX = 1 - Math.sin(gameState.frameCount * 0.5) * 0.05;
