@@ -83,9 +83,9 @@ export const useGameLoop = (
     const prevAttackInput = useRef<{ [key: string]: boolean }>({});
     
     const gameState = useRef<GameState>({
-        // START POSITION FIX: Center of map +/- 400px
-        player: createFighter('player', WORLD_WIDTH / 2 - 400, playerClass),
-        enemy: createFighter('enemy', WORLD_WIDTH / 2 + 400, 'STANDARD'), 
+        // START POSITIONS: Center of map +/- 300px (Closer start)
+        player: createFighter('player', WORLD_WIDTH / 2 - 300, playerClass),
+        enemy: createFighter('enemy', WORLD_WIDTH / 2 + 300, 'STANDARD'), 
         particles: [],
         shockwaves: [],
         impacts: [],
@@ -120,9 +120,8 @@ export const useGameLoop = (
         // Reset State with Selected Class
         gameState.current = {
             ...gameState.current,
-            // RE-APPLY START POSITION FIX ON RESTART
-            player: { ...createFighter('player', WORLD_WIDTH / 2 - 400, playerClass), score: currentPScore },
-            enemy: { ...createFighter('enemy', WORLD_WIDTH / 2 + 400, 'STANDARD'), score: currentEScore },
+            player: { ...createFighter('player', WORLD_WIDTH / 2 - 300, playerClass), score: currentPScore },
+            enemy: { ...createFighter('enemy', WORLD_WIDTH / 2 + 300, 'STANDARD'), score: currentEScore },
             gameActive: true,
             winner: null,
             slowMoFactor: 1.0,

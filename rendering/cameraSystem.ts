@@ -1,114 +1,105 @@
 
-import { MIN_ZOOM, MAX_ZOOM, WORLD_WIDTH, GROUND_Y, MAX_SPEED } from '../constants';
+import { MIN_ZOOM, MAX_ZOOM, WORLD_WIDTH, GROUND_Y, MAX_SPEED, CAMERA_TILT_MAX } from '../constants';
 import { GameState } from '../types';
+
+const lerp = (start: number, end: number, t: number) => {
+    return start + (end - start) * t;
+};
 
 export const updateCamera = (gameState: GameState, viewportWidth: number, viewportHeight: number) => {
     const { player, enemy, shake } = gameState;
 
-    // --- 1. SYSTEME DE ZOOM "SMART PADDING" ---
-    
-    // Distance horizontale brute
+    // --- 1. BOUNDING BOX (La boîte qui contient les deux joueurs) ---
+    // On calcule les limites extrêmes de l'action
     const minX = Math.min(player.x, enemy.x);
     const maxX = Math.max(player.x + player.width, enemy.x + enemy.width);
-    const dist = maxX - minX;
+    const minY = Math.min(player.y, enemy.y);
+    const maxY = Math.max(player.y + player.height, enemy.y + enemy.height);
 
-    // Padding Adaptatif
-    // Si proches (<300px) -> Padding serré (150px) pour l'intimité
-    // Si loin -> Padding large (jusqu'à 400px) pour la visibilité
-    const distRatio = Math.min(1, dist / 800);
-    const adaptivePadding = 150 + (distRatio * 250); // Interpole entre 150 et 400
+    // Centre de l'action (Le point que la caméra veut regarder)
+    const midX = (minX + maxX) / 2;
+    // Pour le Y, on vise un peu plus haut que le milieu pour donner de l'air au dessus des têtes
+    const midY = (minY + maxY) / 2 - 50; 
 
-    const targetWidth = dist + (adaptivePadding * 2);
-    let targetZoom = viewportWidth / targetWidth;
+    // --- 2. ZOOM INTELLIGENT ---
+    const distX = maxX - minX;
+    const distY = maxY - minY;
 
-    // Impact Zoom (Coup reçu)
-    if (shake > 5) {
-        targetZoom += 0.15;
-    }
+    // On calcule le zoom nécessaire pour faire tenir la largeur + marges
+    // On ajoute 400px de marge horizontale (200px de chaque côté)
+    const paddingX = 400; 
+    let targetZoom = viewportWidth / (distX + paddingX);
 
-    // Clamp
+    // Vérification Verticale : Si les joueurs s'écartent beaucoup verticalement (Slinger/Grappin)
+    // On dézoome aussi pour qu'ils rentrent en hauteur
+    const paddingY = 300;
+    const zoomNeededForHeight = viewportHeight / (distY + paddingY);
+    
+    // On prend le zoom le plus "large" (le plus petit chiffre) entre contrainte X et Y
+    targetZoom = Math.min(targetZoom, zoomNeededForHeight);
+
+    // Clamp final (Limites strictes du jeu)
     targetZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, targetZoom));
 
-    // STABILISATION (Hysteresis)
-    // On ne met à jour le zoom que si le changement de largeur nécessaire dépasse 50px
-    // Cela évite l'effet de "pompage" quand les joueurs bougent un tout petit peu.
-    const currentViewW = viewportWidth / gameState.cameraZoom;
-    const neededViewW = viewportWidth / targetZoom;
+    // Effet d'impact (petit coup de zoom)
+    if (shake > 5) targetZoom += 0.05;
+
+    // Application du Zoom
+    // Si on dézoome (target < current), on le fait un peu plus vite pour ne pas perdre l'action
+    const zoomSpeed = targetZoom < gameState.cameraZoom ? 0.1 : 0.05;
+    gameState.cameraZoom = lerp(gameState.cameraZoom, targetZoom, zoomSpeed);
+
+    // --- 3. CALCUL DE LA POSITON CAMÉRA ---
     
-    // On force la mise à jour si c'est un Zoom In rapide (impact) ou si différence significative
-    if (Math.abs(neededViewW - currentViewW) > 50 || shake > 5) {
-         // Smooth Zoom (0.1)
-         gameState.cameraZoom += (targetZoom - gameState.cameraZoom) * 0.1;
+    // Dimensions actuelles de la vue dans le monde
+    const viewW = viewportWidth / gameState.cameraZoom;
+    const viewH = viewportHeight / gameState.cameraZoom;
+
+    // Cible X : Centrée sur l'action
+    let targetCamX = midX - (viewW / 2);
+
+    // LookAhead : Décalage subtil selon la direction du joueur principal
+    // (Seulement si la cam n'est pas déjà au max zoom out)
+    if (gameState.cameraZoom > MIN_ZOOM + 0.1) {
+        targetCamX += player.facing * 50; 
     }
 
-    const zoom = gameState.cameraZoom;
-    const viewW = viewportWidth / zoom;
-    const viewH = viewportHeight / zoom;
+    // Cible Y : Centrée sur l'action, MAIS avec contrainte sol
+    let targetCamY = midY - (viewH / 2);
 
-    // --- 2. POSITIONNEMENT AVEC LOOK-AHEAD ET FOCUS PONDÉRÉ ---
+    // --- 4. CONTRAINTES CRITIQUES (FLOOR & CEILING) ---
 
-    // Centrage Pondéré : On ne prend pas le milieu strict (0.5), 
-    // on donne une légère priorité au joueur pour le "Game Feel" (ex: 55/45)
-    // Cependant, pour la compétition, le milieu strict + lookahead est souvent plus lisible.
-    // Prompt: "Centrage pondéré (70% joueur)" - Attention, cela peut faire sortir l'ennemi.
-    // On utilise le milieu strict pour la base, et le LookAhead du joueur fait le reste.
-    const strictMidX = (minX + maxX) / 2;
+    // CONTRAINTE SOL : Le bas de la caméra ne doit pas être en dessous de GROUND_Y + marge
+    // On veut voir le sol, donc on se cale pour que GROUND_Y soit à environ 100px du bas de l'écran
+    const floorLimit = GROUND_Y + 100 - viewH;
+    
+    // Si la cible calculée (centrée sur les joueurs) est plus basse que la limite sol, on remonte.
+    // Cela empêche la caméra de montrer "sous la map".
+    if (targetCamY > floorLimit) {
+        targetCamY = floorLimit;
+    }
 
-    // Look-Ahead : Basé sur la direction du joueur.
-    // Permet de voir ce qui arrive devant.
-    const lookAhead = player.vx * 15; 
+    // CONTRAINTE PLAFOND : Juste pour éviter les bugs si on s'envole à l'infini
+    if (targetCamY < -WORLD_WIDTH) targetCamY = -WORLD_WIDTH;
 
-    let targetCamX = (strictMidX + lookAhead) - (viewW / 2);
+    // --- 5. LISSAGE & RÉACTIVITÉ (DYNAMIQUE) ---
 
-    // Clamp Monde
+    // Détection Haute Vitesse (Grappin / Dash)
+    const highVelocity = Math.abs(player.vx) > 25 || Math.abs(player.vy) > 20 || player.isGrappling;
+    
+    // Si on va très vite, la caméra devient plus nerveuse (lerp plus élevé)
+    // Sinon, elle est fluide (cinématique)
+    const smoothX = highVelocity ? 0.3 : 0.1;
+    const smoothY = highVelocity ? 0.3 : 0.1;
+
+    // Clamp X Monde (Ne pas sortir à gauche/droite)
     targetCamX = Math.max(0, Math.min(targetCamX, WORLD_WIDTH - viewW));
 
-    // --- 3. POSITIONNEMENT VERTICAL (ANCRE STABLE) ---
+    // Application finale
+    gameState.cameraX = lerp(gameState.cameraX, targetCamX, smoothX);
+    gameState.cameraY = lerp(gameState.cameraY, targetCamY, smoothY);
 
-    // Ancre Sol : 80% vers le bas
-    const groundAnchorY = GROUND_Y - (viewH * 0.80);
-    
-    // Élévation
-    const highestPoint = Math.min(player.y, enemy.y);
-    const skyThreshold = GROUND_Y - 300; 
-
-    let targetCamY = groundAnchorY;
-
-    if (highestPoint < skyThreshold) {
-        const airTargetY = highestPoint - (viewH * 0.25);
-        targetCamY = Math.min(groundAnchorY, airTargetY);
-    }
-    
-    // Sécurité Bas et Haut
-    targetCamY = Math.min(targetCamY, groundAnchorY);
-    targetCamY = Math.max(-2500, targetCamY);
-
-    // --- 4. LISSAGE INTELLIGENT (AMORTISSEMENT DYNAMIQUE) ---
-
-    // X Smoothing : Base 0.2 (Nerveux)
-    let smoothX = 0.2;
-
-    // VÉRIFICATION DE BORDURE (Panic Snap)
-    // Si un joueur est trop près du bord de l'écran (15%), on accélère la caméra
-    const playerScreenX = (player.x - gameState.cameraX) * zoom;
-    const enemyScreenX = (enemy.x - gameState.cameraX) * zoom;
-    const margin = viewportWidth * 0.15;
-
-    if (playerScreenX < margin || playerScreenX > viewportWidth - margin || 
-        enemyScreenX < margin || enemyScreenX > viewportWidth - margin) {
-        smoothX = 0.40; // Rattrapage d'urgence
-    }
-
-    // Y Smoothing : Lent (0.08) pour la lourdeur et la stabilité
-    const smoothY = 0.08;
-
-    gameState.cameraX += (targetCamX - gameState.cameraX) * smoothX;
-    gameState.cameraY += (targetCamY - gameState.cameraY) * smoothY;
-
-    // --- 5. TILT AVEC LAG (POIDS) ---
-    // On utilise un lissage très bas (0.05) pour que le tilt "suive" le mouvement avec retard
-    const targetTilt = (player.vx / MAX_SPEED) * 0.02;
-    gameState.cameraTilt += (targetTilt - gameState.cameraTilt) * 0.05;
-
-    gameState.cameraLookAhead = lookAhead;
+    // Tilt (Inclinaison dynamique)
+    const tilt = (player.vx / MAX_SPEED) * CAMERA_TILT_MAX;
+    gameState.cameraTilt = lerp(gameState.cameraTilt, tilt, 0.1);
 };

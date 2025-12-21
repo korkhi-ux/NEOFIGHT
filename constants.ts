@@ -97,12 +97,15 @@ export const PLAYER_HEIGHT = 100;
 
 // Visuals
 export const TRAIL_LENGTH = 3; // Shortened trails
-export const MAX_ZOOM = 2.0; // Extreme Close-ups (Guilty Gear style)
-export const MIN_ZOOM = 0.55; // Security zoom (avoid making characters tiny)
+
+// --- CAMERA CONFIGURATION ---
+// Visibilité avant tout : 
+export const MAX_ZOOM = 1.3; // Zoom max un peu moins serré pour voir l'action
+export const MIN_ZOOM = 0.65; // Zoom min limité pour ne pas voir des fourmis
 
 // Camera Dynamics
-export const CAMERA_SMOOTHING = 0.15; // More responsive
-export const CAMERA_LOOKAHEAD = 150;
+export const CAMERA_SMOOTHING = 0.12; 
+export const CAMERA_LOOKAHEAD = 80; 
 export const CAMERA_TILT_MAX = 0.015;
 
 // Slinger Mechanics
