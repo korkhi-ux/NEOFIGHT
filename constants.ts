@@ -97,7 +97,7 @@ export const PLAYER_HEIGHT = 100;
 
 // Visuals
 export const TRAIL_LENGTH = 3; // Shortened trails
-export const MAX_ZOOM = 1.8; // High Impact Close-ups
+export const MAX_ZOOM = 2.0; // Extreme Close-ups (Guilty Gear style)
 export const MIN_ZOOM = 0.55; // Security zoom (avoid making characters tiny)
 
 // Camera Dynamics
