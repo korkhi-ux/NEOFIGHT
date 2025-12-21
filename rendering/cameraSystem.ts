@@ -5,35 +5,72 @@ import { GameState } from '../types';
 export const updateCamera = (gameState: GameState, viewportWidth: number, viewportHeight: number) => {
     const { player, enemy } = gameState;
     
+    // 1. Calculate Midpoints (Target Centers)
     const midX = (player.x + enemy.x + PLAYER_WIDTH) / 2;
-    const dist = Math.abs(player.x - enemy.x);
+    const midY = (player.y + enemy.y + PLAYER_HEIGHT) / 2;
 
-    const desiredZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, (viewportWidth * 0.55) / dist));
+    const distX = Math.abs(player.x - enemy.x);
+    const distY = Math.abs(player.y - enemy.y);
+
+    // 2. Adaptive Zoom (Consider both Horizontal and Vertical distance)
+    // We calculate the zoom required to fit X, and the zoom required to fit Y.
+    // We take the minimum of the two (which results in the widest/furthest view).
+    
+    // Factor 0.55 ensures players stay within the central 55% of the screen
+    const zoomForX = (viewportWidth * 0.55) / (distX + 150); 
+    const zoomForY = (viewportHeight * 0.55) / (distY + 150);
+    
+    // Choose the zoom that accommodates the largest dimension needed
+    let desiredZoom = Math.min(zoomForX, zoomForY);
+    
+    // Clamp Zoom limits
+    desiredZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, desiredZoom));
+
     gameState.cameraZoom += (desiredZoom - gameState.cameraZoom) * CAMERA_SMOOTHING;
     const zoom = gameState.cameraZoom;
 
-    // Look Ahead
-    const playerVel = player.isDashing ? player.vx * 1.5 : player.vx;
-    const lookAheadTarget = playerVel * 10;
-    gameState.cameraLookAhead += (lookAheadTarget - gameState.cameraLookAhead) * 0.05;
+    // 3. Look Ahead Logic
+    
+    // Horizontal Look-Ahead (Anticipate running direction)
+    const playerVelX = player.isDashing ? player.vx * 1.5 : player.vx;
+    const lookAheadTargetX = playerVelX * 10;
+    gameState.cameraLookAhead += (lookAheadTargetX - gameState.cameraLookAhead) * 0.05;
 
-    // Dynamic Tilt
-    // If speed is very low, snap target to 0
+    // Vertical Look-Ahead (Anticipate jumping/grappling up)
+    // If player is moving UP fast (negative VY), shift camera UP.
+    const lookAheadTargetY = player.vy < -5 ? player.vy * 12 : 0;
+    
+    // We smooth this vertically by directly adding it to the target calculation below, 
+    // or we could state-track it if we wanted smoother transitions, 
+    // but direct mapping feels more responsive for fast jumps.
+
+    // 4. Dynamic Tilt
     const targetTilt = (Math.abs(player.vx) < 1.0) 
         ? 0 
         : (player.vx / MAX_SPEED) * CAMERA_TILT_MAX;
         
-    // Faster return to 0 (0.2) than tilt accumulation (0.1)
     const tiltSmoothing = Math.abs(player.vx) < 1.0 ? 0.2 : 0.1;
     gameState.cameraTilt += (targetTilt - gameState.cameraTilt) * tiltSmoothing;
 
+    // 5. Final Target Calculation
     const viewW = viewportWidth / zoom;
     const viewH = viewportHeight / zoom;
+
     let targetCamX = midX - viewW / 2 + gameState.cameraLookAhead;
-    let targetCamY = GROUND_Y - viewH * 0.75; 
     
+    // Vertical Target: Center on MidY, apply LookAhead, and offset slightly so players are lower-third grounded
+    let targetCamY = midY - viewH / 2 + lookAheadTargetY;
+
+    // 6. Clamping (World Bounds)
+    
+    // Horizontal Clamp
     targetCamX = Math.max(0, Math.min(targetCamX, WORLD_WIDTH - viewW));
-    targetCamY = Math.max(-200, Math.min(targetCamY, GROUND_Y + 100 - viewH));
+
+    // Vertical Clamp
+    // Allow going high up (-1500) for grapple gameplay
+    // Prevent going too low (Seeing below ground)
+    // GROUND_Y + 150 allows seeing a bit of "underground" for shake effects, but stops there.
+    targetCamY = Math.max(-1500, Math.min(targetCamY, GROUND_Y + 150 - viewH));
 
     gameState.cameraX += (targetCamX - gameState.cameraX) * CAMERA_SMOOTHING;
     gameState.cameraY += (targetCamY - gameState.cameraY) * CAMERA_SMOOTHING;
