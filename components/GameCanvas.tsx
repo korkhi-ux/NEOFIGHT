@@ -1,12 +1,13 @@
 import React, { useEffect, useRef } from 'react';
 import { 
-  CANVAS_WIDTH, CANVAS_HEIGHT, GROUND_Y, GRAVITY, FRICTION, 
+  CANVAS_WIDTH, CANVAS_HEIGHT, WORLD_WIDTH, GROUND_Y, GRAVITY, FRICTION, 
   PLAYER_SPEED, JUMP_FORCE, MAX_SPEED, DASH_SPEED, DASH_DURATION, 
   DASH_COOLDOWN, ATTACK_DURATIONS, ATTACK_DAMAGES, ATTACK_KNOCKBACKS, 
   ATTACK_RANGE, ATTACK_COOLDOWN, COMBO_WINDOW, HIT_FLASH_DURATION,
-  PLAYER_WIDTH, PLAYER_HEIGHT, COLORS, AIR_RESISTANCE, TRAIL_LENGTH, MAX_ZOOM, MIN_ZOOM
+  PLAYER_WIDTH, PLAYER_HEIGHT, COLORS, AIR_RESISTANCE, TRAIL_LENGTH, MAX_ZOOM, MIN_ZOOM,
+  CAMERA_SMOOTHING, CAMERA_LOOKAHEAD, CAMERA_TILT_MAX
 } from '../constants';
-import { Fighter, GameState, TrailPoint, Shockwave } from '../types';
+import { Fighter, GameState, TrailPoint, Shockwave, ImpactEffect, LensFlare } from '../types';
 
 // --- AUDIO SYSTEM ---
 class AudioManager {
@@ -182,6 +183,7 @@ const createFighter = (id: 'player' | 'enemy', x: number, colorSet: typeof COLOR
   attackCooldown: 0,
   scaleX: 1,
   scaleY: 1,
+  rotation: 0,
   color: colorSet,
   score: 0
 });
@@ -192,7 +194,7 @@ interface GameCanvasProps {
   gameActive: boolean;
 }
 
-const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
+export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioRef = useRef<AudioManager | null>(null);
   const keys = useRef<{ [key: string]: boolean }>({});
@@ -201,12 +203,20 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
 
   const gameState = useRef<GameState>({
     player: createFighter('player', 200, COLORS.player),
-    enemy: createFighter('enemy', CANVAS_WIDTH - 250, COLORS.enemy),
+    enemy: createFighter('enemy', WORLD_WIDTH - 250, COLORS.enemy),
     particles: [],
     shockwaves: [],
+    impacts: [],
+    flares: [],
     shake: 0,
+    shakeX: 0,
+    shakeY: 0,
     chromaticAberration: 0,
     cameraZoom: 1,
+    cameraX: 0,
+    cameraY: 0,
+    cameraLookAhead: 0,
+    cameraTilt: 0,
     winner: null,
     gameActive: false,
     frameCount: 0,
@@ -222,8 +232,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
     if (gameActive && audioRef.current) {
         audioRef.current.resume();
     }
-    // Cleanup on unmount is handled by browser for AudioContext usually, 
-    // but good to close if we were strict.
     return () => {
         if (!gameActive && audioRef.current) {
             audioRef.current.ctx.suspend();
@@ -235,12 +243,20 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
     if (gameActive) {
       gameState.current = {
         player: createFighter('player', 200, COLORS.player),
-        enemy: createFighter('enemy', CANVAS_WIDTH - 250, COLORS.enemy),
+        enemy: createFighter('enemy', WORLD_WIDTH - 250, COLORS.enemy),
         particles: [],
         shockwaves: [],
+        impacts: [],
+        flares: [],
         shake: 0,
+        shakeX: 0,
+        shakeY: 0,
         chromaticAberration: 0,
         cameraZoom: 1,
+        cameraX: 0,
+        cameraY: 0,
+        cameraLookAhead: 0,
+        cameraTilt: 0,
         winner: null,
         gameActive: true,
         frameCount: 0,
@@ -284,14 +300,15 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
     f.prevVx = f.vx;
     f.prevGrounded = f.isGrounded;
 
-    // --- Friction Particles ---
+    // --- Friction Particles & Land Squash ---
     if (f.isGrounded && justChangedDir) {
         createParticles(f.x + f.width/2, f.y + f.height, 5, f.color.glow, 4);
     }
     if (justLanded) {
         createParticles(f.x + f.width/2, f.y + f.height, 8, '#ffffff', 3);
-        f.scaleX = 1.3; 
-        f.scaleY = 0.7;
+        // Deep Impact Squash
+        f.scaleX = 1.4; 
+        f.scaleY = 0.6;
     }
 
     // --- Timers (Scaled by Time) ---
@@ -305,21 +322,23 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
         f.comboCount = 0;
     }
 
-    // --- Ghosting / Trail Logic ---
-    const isHighSpeed = f.isDashing || (f.isAttacking && f.comboCount === 2);
-    if (isHighSpeed && gameState.current.frameCount % (Math.ceil(3/timeScale)) === 0) {
+    // --- Kinetic Trails ---
+    // Only trail if moving fast, attacking or dashing
+    const isHighSpeed = Math.abs(f.vx) > 5 || f.isDashing || f.isAttacking;
+    if (isHighSpeed && gameState.current.frameCount % (Math.ceil(2/timeScale)) === 0) {
         f.trail.push({
             x: f.x,
             y: f.y,
             scaleX: f.scaleX,
             scaleY: f.scaleY,
+            rotation: f.rotation,
             facing: f.facing,
-            alpha: 0.6,
+            alpha: 0.5,
             color: f.color.glow
         });
     }
     for (let i = f.trail.length - 1; i >= 0; i--) {
-        f.trail[i].alpha -= 0.05 * timeScale;
+        f.trail[i].alpha -= 0.08 * timeScale; // Faster fade
         if (f.trail[i].alpha <= 0) f.trail.splice(i, 1);
     }
 
@@ -332,7 +351,6 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
       if (f.isAttacking) {
           isCanceling = true;
           f.isAttacking = false;
-          createParticles(f.x + f.width/2, f.y + f.height/2, 5, '#fff', 2);
       }
       f.isDashing = true;
       f.dashTimer = DASH_DURATION;
@@ -342,9 +360,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
       const dashDir = input.x !== 0 ? Math.sign(input.x) : f.facing;
       f.facing = dashDir as 1 | -1;
       
-      f.scaleX = 1.4;
-      f.scaleY = 0.6;
-      gameState.current.shake += 2; // Micro shake on dash
+      // Extreme Stretch
+      f.scaleX = 1.6;
+      f.scaleY = 0.5;
+      gameState.current.shake += 2;
     }
 
     // Jump
@@ -355,8 +374,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
        }
        f.vy = JUMP_FORCE;
        f.isGrounded = false;
-       f.scaleX = 0.7;
-       f.scaleY = 1.4;
+       // Stretch Up
+       f.scaleX = 0.6;
+       f.scaleY = 1.5;
        createParticles(f.x + f.width/2, f.y + f.height, 5, '#fff', 3);
        audioRef.current?.playJump();
     }
@@ -385,14 +405,18 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
             f.attackTimer = ATTACK_DURATIONS[f.comboCount];
             f.comboTimer = COMBO_WINDOW; 
             
+            // Attack Impulse Stretch
+            f.scaleX = 1.3;
+            f.scaleY = 0.8;
+            
             // Heavy lunge
             if (f.comboCount === 2) {
-                f.vx = f.facing * 35; // increased lunge
-                f.scaleX = 1.5;
+                f.vx = f.facing * 40; 
+                f.scaleX = 1.8; // Huge stretch for finisher
                 f.scaleY = 0.5;
                 gameState.current.shake += 4;
             } else {
-                f.vx = f.facing * 8; 
+                f.vx = f.facing * 10; 
             }
         }
     }
@@ -414,22 +438,20 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
     } 
     else if (f.isAttacking) {
         f.attackTimer -= timeScale;
-        if (f.isGrounded) f.vx *= 0.9;
+        if (f.isGrounded) f.vx *= 0.85;
         else f.vx *= 0.95;
 
         if (f.attackTimer <= 0) {
             f.isAttacking = false;
             f.attackCooldown = ATTACK_COOLDOWN; 
-            
-            // AI Hook: If AI finishes a full combo (Heavy hit), trigger recovery
             if (f.id === 'enemy' && f.comboCount === 2 && f.aiState) {
-                f.aiState.recoveryTimer = 30; // 0.5s pause
+                f.aiState.recoveryTimer = 30; 
             }
         }
     }
     else {
         const accel = f.isGrounded ? PLAYER_SPEED : PLAYER_SPEED * 0.8;
-        f.vx += input.x * accel * timeScale; // Apply Time Scale to Accel
+        f.vx += input.x * accel * timeScale; 
 
         if (Math.abs(f.vx) > MAX_SPEED) f.vx = Math.sign(f.vx) * MAX_SPEED;
 
@@ -438,9 +460,8 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
         }
     }
 
-    if (!f.isDashing) f.vy += GRAVITY * timeScale; // Apply Time Scale to Gravity
+    if (!f.isDashing) f.vy += GRAVITY * timeScale;
 
-    // Apply Velocity with Time Scale
     f.x += f.vx * timeScale;
     f.y += f.vy * timeScale;
 
@@ -453,18 +474,30 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
         f.isGrounded = false;
     }
 
-    // Wall Collision
+    // World Boundary
     if (f.x < 0) { f.x = 0; f.vx = 0; }
-    if (f.x + f.width > CANVAS_WIDTH) { f.x = CANVAS_WIDTH - f.width; f.vx = 0; }
+    if (f.x + f.width > WORLD_WIDTH) { f.x = WORLD_WIDTH - f.width; f.vx = 0; }
 
     // Facing
     if (input.x !== 0 && !f.isDashing && !f.isAttacking) {
       f.facing = Math.sign(input.x) as 1 | -1;
     }
 
-    // Anim Recovery
-    f.scaleX += (1 - f.scaleX) * 0.15 * timeScale;
-    f.scaleY += (1 - f.scaleY) * 0.15 * timeScale;
+    // --- Organic Animation (Squash/Stretch/Tilt) ---
+    // Spring back to 1
+    f.scaleX += (1 - f.scaleX) * 0.2 * timeScale;
+    f.scaleY += (1 - f.scaleY) * 0.2 * timeScale;
+
+    // Tilt based on speed
+    const targetRot = (f.vx / MAX_SPEED) * 0.2; // Max 0.2 rads
+    f.rotation += (targetRot - f.rotation) * 0.2 * timeScale;
+    
+    // Run Bounce
+    if (Math.abs(f.vx) > 1 && f.isGrounded) {
+        f.scaleY = 1 + Math.sin(gameState.current.frameCount * 0.5) * 0.05;
+        f.scaleX = 1 - Math.sin(gameState.current.frameCount * 0.5) * 0.05;
+    }
+
   };
 
   // --- Effects Systems ---
@@ -485,6 +518,25 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
       }
   };
 
+  const createImpact = (x: number, y: number, color: string) => {
+      gameState.current.impacts.push({
+          id: Math.random().toString(),
+          x, y,
+          life: 15, // Short life
+          color,
+          rotation: Math.random() * Math.PI
+      });
+  };
+
+  const createFlare = (x: number, y: number, color: string) => {
+      gameState.current.flares.push({
+          id: Math.random().toString(),
+          x, y,
+          life: 20,
+          color
+      });
+  };
+
   const createShockwave = (x: number, y: number, color: string) => {
       gameState.current.shockwaves.push({
           id: Math.random().toString(),
@@ -495,27 +547,10 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
           width: 5,
           alpha: 1
       });
-
-      for(let i=0; i<8; i++) {
-         const angle = (Math.PI * 2 / 8) * i;
-         gameState.current.particles.push({
-             id: Math.random().toString(),
-             x: x,
-             y: y,
-             vx: Math.cos(angle) * 15,
-             vy: Math.sin(angle) * 15,
-             life: 10,
-             maxLife: 10,
-             color: '#ffffff',
-             size: 3
-         });
-      }
   };
 
-  const updateParticlesAndWaves = () => {
-    const { particles, shockwaves, slowMoFactor } = gameState.current;
-    
-    // Slow mo affects particles too!
+  const updateEffects = () => {
+    const { particles, shockwaves, impacts, flares, slowMoFactor } = gameState.current;
     const timeScale = slowMoFactor;
 
     for (let i = particles.length - 1; i >= 0; i--) {
@@ -529,10 +564,20 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
     }
     for (let i = shockwaves.length - 1; i >= 0; i--) {
         const s = shockwaves[i];
-        s.radius += 15 * timeScale;
+        s.radius += 20 * timeScale;
         s.alpha -= 0.1 * timeScale;
         s.width *= 0.8;
         if (s.alpha <= 0) shockwaves.splice(i, 1);
+    }
+    for (let i = impacts.length - 1; i >= 0; i--) {
+        const imp = impacts[i];
+        imp.life -= timeScale;
+        if (imp.life <= 0) impacts.splice(i, 1);
+    }
+    for (let i = flares.length - 1; i >= 0; i--) {
+        const f = flares[i];
+        f.life -= timeScale;
+        if (f.life <= 0) flares.splice(i, 1);
     }
   };
 
@@ -543,24 +588,13 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
       if (attacker.isAttacking) {
         const frameToHit = Math.floor(ATTACK_DURATIONS[attacker.comboCount] / 2);
         
-        // We use Math.abs(current - target) < 0.6 because of float logic in slowmo
-        if (Math.abs(attacker.attackTimer - frameToHit) < 1.0 * gameState.current.slowMoFactor) {
-             // Only hit once per attack phase. We check if we are "around" the frame.
-             // But simpler: just check if we haven't hit yet this attack?
-             // Actually, the timer decrements. Logic: check if we just passed the threshold.
-        }
-
-        // Logic fix for floating point timers: 
-        // We trigger hit if attackTimer crosses the threshold.
-        // Since we don't store "hasHit", we rely on the specific frame check.
-        // With slowmo, this might be skipped or triggered twice.
-        // Better: hit if attackTimer <= frameToHit && attackTimer > frameToHit - timeScale
-        if (attacker.attackTimer <= frameToHit && attacker.attackTimer > frameToHit - gameState.current.slowMoFactor) {
+        // Relaxed window for slow mo
+        if (attacker.attackTimer <= frameToHit && attacker.attackTimer > frameToHit - gameState.current.slowMoFactor * 1.5) {
             let range = ATTACK_RANGE;
             let heightMod = 0;
             
             if (attacker.comboCount === 1) { range = ATTACK_RANGE * 1.2; heightMod = 20; }
-            if (attacker.comboCount === 2) { range = ATTACK_RANGE * 1.5; heightMod = 40; }
+            if (attacker.comboCount === 2) { range = ATTACK_RANGE * 2.0; heightMod = 40; } // Big Heavy Range
 
             const hitboxX = attacker.facing === 1 ? attacker.x + attacker.width : attacker.x - range;
             const hitboxW = range;
@@ -586,15 +620,31 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
   const handleHit = (attacker: Fighter, defender: Fighter) => {
     if (defender.isDashing) return; 
 
+    const impactX = defender.x + defender.width/2;
+    const impactY = defender.y + defender.height/2;
+
     // Visuals
-    defender.hitFlashTimer = HIT_FLASH_DURATION;
+    defender.hitFlashTimer = HIT_FLASH_DURATION; // Used for global inversion effect
     audioRef.current?.playHit(attacker.comboCount === 2);
+
+    // Directional Shake Logic
+    const dx = defender.x - attacker.x;
+    const dy = defender.y - attacker.y;
+    const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+    // Shake screen IN direction of impact
+    gameState.current.shakeX = (dx/dist) * 20;
+    gameState.current.shakeY = (dy/dist) * 10;
     
+    // Impact Lines
+    createImpact(impactX, impactY, '#ffffff');
+
     if (attacker.comboCount === 2) {
-        gameState.current.chromaticAberration = 10;
-        gameState.current.shake = 25;
+        // Heavy Hit
+        gameState.current.chromaticAberration = 15;
+        gameState.current.shake = 30;
+        createFlare(impactX, impactY, attacker.color.glow); // Cinematic Flare
     } else {
-        gameState.current.shake = 8 + (attacker.comboCount * 5);
+        gameState.current.shake = 10;
     }
 
     // Physics
@@ -605,15 +655,13 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
     defender.vx = attacker.facing * knockback;
     defender.vy = -5;
     
-    defender.scaleX = 0.7;
-    defender.scaleY = 1.3;
+    // Impact Squash
+    defender.scaleX = 0.5;
+    defender.scaleY = 1.5;
 
     // FX Spawning
-    const impactX = defender.x + defender.width/2;
-    const impactY = defender.y + defender.height/2;
-    
-    createParticles(impactX, impactY, 15, '#fff', 8);
-    createParticles(impactX, impactY, 10, attacker.color.glow, 10);
+    createParticles(impactX, impactY, 15, '#fff', 12);
+    createParticles(impactX, impactY, 10, attacker.color.glow, 15);
     createShockwave(impactX, impactY, attacker.color.glow);
 
     // --- GAME OVER & SLOW MO FINISH ---
@@ -624,12 +672,13 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
         gameState.current.winner = attacker.id;
         
         // SLOW MO TRIGGER
-        gameState.current.slowMoFactor = 0.2; // 5x slower
-        gameState.current.slowMoTimer = 120; // 2 seconds @ 60fps
+        gameState.current.slowMoFactor = 0.1; 
+        gameState.current.slowMoTimer = 180; 
+        createFlare(impactX, impactY, '#ffffff');
         
         audioRef.current?.playKO();
 
-        setTimeout(() => onGameOver(attacker.id), 2000); // Wait for slow mo
+        setTimeout(() => onGameOver(attacker.id), 3000); 
     }
   };
 
@@ -754,70 +803,138 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
   // --- DRAWING ---
 
   const draw = (ctx: CanvasRenderingContext2D) => {
-    const { player, enemy, particles, shockwaves, shake, frameCount } = gameState.current;
-    const width = ctx.canvas.width;
-    const height = ctx.canvas.height;
+    const { player, enemy, particles, shockwaves, impacts, flares, shake, shakeX, shakeY, frameCount } = gameState.current;
+    const width = ctx.canvas.width;   
+    const height = ctx.canvas.height; 
 
-    // --- Dynamic Camera ---
+    // --- Predictive Camera Dynamics ---
     const midX = (player.x + enemy.x + PLAYER_WIDTH) / 2;
     const midY = (player.y + enemy.y + PLAYER_HEIGHT) / 2;
     const dist = Math.abs(player.x - enemy.x);
 
-    const targetZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, 1 + (1 - (dist / (CANVAS_WIDTH * 0.7))) * 0.3));
-    gameState.current.cameraZoom += (targetZoom - gameState.current.cameraZoom) * 0.1;
+    const desiredZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, (width * 0.55) / dist));
+    gameState.current.cameraZoom += (desiredZoom - gameState.current.cameraZoom) * CAMERA_SMOOTHING;
     const zoom = gameState.current.cameraZoom;
 
-    let shakeX = 0; 
-    let shakeY = 0;
-    const baseShake = 0.5; 
-    const activeShake = shake + baseShake; 
-    
-    shakeX = (Math.random() - 0.5) * activeShake;
-    shakeY = (Math.random() - 0.5) * activeShake;
+    // Look Ahead
+    const playerVel = player.isDashing ? player.vx * 1.5 : player.vx;
+    const lookAheadTarget = playerVel * 10;
+    gameState.current.cameraLookAhead += (lookAheadTarget - gameState.current.cameraLookAhead) * 0.05;
 
+    // Dynamic Tilt
+    const targetTilt = (player.vx / MAX_SPEED) * CAMERA_TILT_MAX;
+    gameState.current.cameraTilt += (targetTilt - gameState.current.cameraTilt) * 0.1;
+
+    const viewW = width / zoom;
+    const viewH = height / zoom;
+    let targetCamX = midX - viewW / 2 + gameState.current.cameraLookAhead;
+    let targetCamY = GROUND_Y - viewH * 0.75; 
+    targetCamX = Math.max(0, Math.min(targetCamX, WORLD_WIDTH - viewW));
+    targetCamY = Math.max(-200, Math.min(targetCamY, GROUND_Y + 100 - viewH));
+
+    gameState.current.cameraX += (targetCamX - gameState.current.cameraX) * CAMERA_SMOOTHING;
+    gameState.current.cameraY += (targetCamY - gameState.current.cameraY) * CAMERA_SMOOTHING;
+
+    const camX = gameState.current.cameraX;
+    const camY = gameState.current.cameraY;
+
+    // Noise Shake + Directional Shake
+    const activeShake = shake + 0.5; 
+    const noiseX = (Math.random() - 0.5) * activeShake;
+    const noiseY = (Math.random() - 0.5) * activeShake;
+    const totalShakeX = noiseX + shakeX;
+    const totalShakeY = noiseY + shakeY;
+
+    // --- RENDER PASS ---
     ctx.save();
+    
+    // Hit Frame: Invert Colors
+    if (player.hitFlashTimer > 0 || enemy.hitFlashTimer > 0) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0,0,width,height);
+        ctx.globalCompositeOperation = 'difference';
+    } else {
+        ctx.fillStyle = COLORS.backgroundFar;
+        ctx.fillRect(0, 0, width, height);
+    }
+
+    // Apply Camera Transform
     ctx.translate(width/2, height/2);
+    ctx.rotate(gameState.current.cameraTilt);
     ctx.scale(zoom, zoom);
     ctx.translate(-width/2, -height/2);
-    
-    const offsetX = (width/2 - midX) * 0.5;
-    const offsetY = (height/2 - midY) * 0.2 + 50;
-    
-    ctx.translate(offsetX + shakeX, offsetY + shakeY);
+    ctx.translate(-camX + totalShakeX / zoom, -camY + totalShakeY / zoom);
 
+    // --- Background Layers ---
+    if (!(player.hitFlashTimer > 0 || enemy.hitFlashTimer > 0)) {
+        // Sky
+        ctx.save();
+        ctx.translate(camX * 0.1, 0); 
+        ctx.fillStyle = COLORS.background;
+        for (let i = 0; i < 5; i++) {
+            const x = (i * 800) % WORLD_WIDTH;
+            ctx.fillStyle = 'rgba(10, 20, 50, 0.5)';
+            ctx.fillRect(x + 200, GROUND_Y - 600, 300, 600);
+        }
+        ctx.restore();
 
-    // --- Background ---
-    ctx.fillStyle = COLORS.background;
-    ctx.fillRect(-100, -100, width + 200, height + 200); 
-    
-    // Grid
-    ctx.strokeStyle = COLORS.grid;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    const horizon = height * 0.4;
-    for (let i = -500; i < width + 500; i += 50) {
-        ctx.moveTo(width/2 + (i - width/2) * 0.2, horizon);
-        ctx.lineTo(i, height + 100);
+        // Mid
+        ctx.save();
+        ctx.translate(camX * 0.4, 0); 
+        ctx.fillStyle = 'rgba(20, 40, 100, 0.2)';
+        for (let i = 0; i < 20; i++) {
+            const x = (i * 400) % (WORLD_WIDTH * 1.5);
+            const y = GROUND_Y - 200 - (i % 3) * 100;
+            const size = 40 + (i % 4) * 20;
+            ctx.fillRect(x, y, size, size);
+        }
+        ctx.restore();
+
+        // Floor Grid
+        ctx.lineWidth = 2;
+        const startX = Math.floor(camX / 100) * 100;
+        const endX = Math.min(WORLD_WIDTH, camX + viewW + 100);
+        const startY = GROUND_Y;
+        const endY = GROUND_Y + 300;
+
+        for (let x = startX; x <= endX; x += 100) {
+            for (let y = startY; y <= endY; y += 100) {
+                const centerX = x + 50;
+                const distToP = Math.abs(centerX - player.x);
+                const distToE = Math.abs(centerX - enemy.x);
+                const minD = Math.min(distToP, distToE);
+                
+                let alpha = 0.05;
+                let color = COLORS.grid;
+                if (minD < 200) {
+                    alpha = 0.3 + (1 - minD / 200) * 0.5;
+                    color = COLORS.gridHighlight;
+                }
+                ctx.strokeStyle = color;
+                ctx.globalAlpha = alpha;
+                ctx.strokeRect(x, y, 100, 100);
+                if (minD < 150) {
+                    ctx.fillStyle = color;
+                    ctx.globalAlpha = alpha * 0.2;
+                    ctx.fillRect(x, y, 100, 100);
+                }
+            }
+        }
+        ctx.globalAlpha = 1.0;
+        
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 3;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = COLORS.player.glow;
+        ctx.beginPath();
+        ctx.moveTo(0, GROUND_Y);
+        ctx.lineTo(WORLD_WIDTH, GROUND_Y);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
     }
-    for (let i = horizon; i < height + 100; i += 40) {
-        ctx.moveTo(-100, i);
-        ctx.lineTo(width + 100, i);
-    }
-    ctx.stroke();
-
-    // Floor
-    ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 4;
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = '#fff';
-    ctx.beginPath();
-    ctx.moveTo(-1000, GROUND_Y);
-    ctx.lineTo(width + 1000, GROUND_Y);
-    ctx.stroke();
-    ctx.shadowBlur = 0;
 
 
-    // --- Entities Helper ---
+    // --- Entities ---
     const drawFighter = (f: Fighter) => {
         if (f.health <= 0 && f.id === 'enemy' && f.scaleY > 0) {
              f.scaleY *= 0.9;
@@ -825,46 +942,42 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
              f.color.glow = '#000';
         }
 
-        f.trail.forEach(t => {
+        // Kinetic Blur Trails (Connected Lines)
+        if (f.trail.length > 1) {
             ctx.save();
-            ctx.translate(t.x + f.width / 2, t.y + f.height);
-            ctx.scale(t.scaleX, t.scaleY);
-            ctx.globalAlpha = t.alpha * 0.5;
-            ctx.fillStyle = t.color;
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = t.color;
-            const bW = f.width; const bH = f.height;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            // Draw a simplified path connecting trails
             ctx.beginPath();
-            ctx.roundRect(-bW/2, -bH, bW, bH, 8);
-            ctx.fill();
+            const last = f.trail[f.trail.length-1];
+            ctx.moveTo(last.x + f.width/2, last.y + f.height/2);
+            
+            for(let i=f.trail.length-2; i>=0; i--) {
+                const t = f.trail[i];
+                ctx.lineTo(t.x + f.width/2, t.y + f.height/2);
+            }
+            ctx.lineTo(f.x + f.width/2, f.y + f.height/2);
+            
+            ctx.lineWidth = f.width * 0.8;
+            ctx.strokeStyle = f.color.glow;
+            ctx.globalAlpha = 0.2;
+            ctx.stroke();
             ctx.restore();
-        });
+        }
 
+        // Body
         ctx.save();
         ctx.translate(f.x + f.width / 2, f.y + f.height);
+        
+        // Apply Tilt Rotation
+        ctx.rotate(f.rotation * f.facing); 
+        
         ctx.scale(f.scaleX, f.scaleY);
         
-        if (f.hitFlashTimer > 0) {
-            ctx.fillStyle = '#ffffff';
-            ctx.shadowBlur = 50;
-            ctx.shadowColor = '#ffffff';
-            
-            if (gameState.current.chromaticAberration > 0) {
-                ctx.globalCompositeOperation = 'screen';
-                ctx.fillStyle = '#ff0000';
-                ctx.fillRect(-f.width/2 + 4, -f.height + 4, f.width, f.height);
-                ctx.fillStyle = '#0000ff';
-                ctx.fillRect(-f.width/2 - 4, -f.height - 4, f.width, f.height);
-                ctx.globalCompositeOperation = 'source-over';
-                ctx.fillStyle = '#ffffff'; 
-            }
-
-        } else {
-            ctx.fillStyle = f.color.primary;
-            const flicker = Math.abs(Math.sin(frameCount * 0.2)) * 10 + 20;
-            ctx.shadowBlur = flicker;
-            ctx.shadowColor = f.color.glow;
-        }
+        ctx.fillStyle = f.color.primary;
+        const flicker = Math.abs(Math.sin(frameCount * 0.2)) * 10 + 20;
+        ctx.shadowBlur = flicker;
+        ctx.shadowColor = f.color.glow;
 
         const bodyW = f.width;
         const bodyH = f.height;
@@ -872,31 +985,59 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
         ctx.beginPath();
         ctx.roundRect(-bodyW/2, -bodyH, bodyW, bodyH, 8); 
         ctx.fill();
-
+        
         if (f.hitFlashTimer <= 0) {
             ctx.fillStyle = '#fff';
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = '#fff';
+            ctx.shadowBlur = 5;
             const eyeOffset = f.facing === 1 ? bodyW/4 : -bodyW/4 - 10;
-            ctx.fillRect(eyeOffset, -bodyH + 20, 15, 5);
+            ctx.fillRect(eyeOffset, -bodyH + 20, 15, 4);
         }
 
+        // --- ANIME SLASHES (Light Ovals) ---
         if (f.isAttacking) {
-            ctx.fillStyle = f.color.glow;
-            ctx.shadowBlur = 40;
-            ctx.beginPath();
-            const swingX = f.facing === 1 ? bodyW/2 : -bodyW/2;
+            ctx.save();
+            // Position flash relative to body center
+            ctx.translate(0, -bodyH/2);
+            
+            const slashColor = f.color.glow;
+            const coreColor = '#ffffff';
+            
+            // Setup Gradient
+            // We draw a huge ellipse and use gradient
             
             if (f.comboCount === 0) {
-                ctx.rect(swingX, -bodyH/2 - 10, f.facing * 60, 20);
+                // Diagonal Quick Slash
+                ctx.rotate(f.facing * Math.PI / 4);
+                ctx.translate(f.facing * 40, 0);
             } else if (f.comboCount === 1) {
-                ctx.moveTo(swingX, -bodyH);
-                ctx.lineTo(swingX + f.facing * 80, -bodyH/2);
-                ctx.lineTo(swingX, 0);
+                // Vertical Wide Slash
+                ctx.rotate(f.facing * Math.PI / 8); 
+                ctx.translate(f.facing * 60, -20);
             } else {
-                ctx.arc(swingX, -bodyH/2, 90, f.facing === 1 ? -1 : Math.PI - 1, f.facing === 1 ? 1 : Math.PI + 1, false);
+                // Heavy Horizontal Thrust
+                ctx.translate(f.facing * 80, 0);
             }
+
+            // Dimensions
+            let len = 100;
+            let thick = 15;
+            if (f.comboCount === 1) { len = 140; thick = 25; }
+            if (f.comboCount === 2) { len = 250; thick = 40; } // Massive heavy
+
+            const grad = ctx.createRadialGradient(0, 0, thick * 0.2, 0, 0, len * 0.6);
+            grad.addColorStop(0, coreColor);
+            grad.addColorStop(0.3, slashColor);
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            
+            ctx.fillStyle = grad;
+            ctx.shadowBlur = 30;
+            ctx.shadowColor = slashColor;
+            
+            ctx.beginPath();
+            ctx.ellipse(0, 0, len, thick, 0, 0, Math.PI * 2);
             ctx.fill();
+
+            ctx.restore();
         }
         
         ctx.restore();
@@ -905,6 +1046,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
     drawFighter(enemy);
     drawFighter(player);
 
+    // --- Impacts & Shockwaves ---
     shockwaves.forEach(s => {
         ctx.save();
         ctx.translate(s.x, s.y);
@@ -919,6 +1061,31 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
         ctx.restore();
     });
 
+    // --- IMPACT LINES (Cross/Star) ---
+    impacts.forEach(imp => {
+        ctx.save();
+        ctx.translate(imp.x, imp.y);
+        ctx.rotate(imp.rotation);
+        
+        ctx.strokeStyle = imp.color;
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = imp.color;
+        
+        const size = 60 * (imp.life / 15);
+        
+        ctx.beginPath();
+        // Cross
+        ctx.moveTo(-size, 0); ctx.lineTo(size, 0);
+        ctx.moveTo(0, -size); ctx.lineTo(0, size);
+        // Diagonals (smaller)
+        ctx.moveTo(-size*0.5, -size*0.5); ctx.lineTo(size*0.5, size*0.5);
+        ctx.moveTo(size*0.5, -size*0.5); ctx.lineTo(-size*0.5, size*0.5);
+        
+        ctx.stroke();
+        ctx.restore();
+    });
+
     particles.forEach(p => {
         ctx.save();
         ctx.translate(p.x, p.y);
@@ -926,23 +1093,83 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
         ctx.shadowBlur = 10;
         ctx.shadowColor = p.color;
         ctx.globalAlpha = p.life / p.maxLife;
-        ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+        // Elongated sparks
+        const len = p.size * (1 + Math.abs(p.vx)*0.2);
+        const angle = Math.atan2(p.vy, p.vx);
+        ctx.rotate(angle);
+        ctx.fillRect(-len/2, -p.size/2, len, p.size);
         ctx.restore();
     });
 
-    ctx.restore(); // Restore Camera transform
+    // --- CINEMATIC LENS FLARES ---
+    flares.forEach(f => {
+        ctx.save();
+        ctx.translate(f.x, f.y);
+        ctx.globalCompositeOperation = 'screen';
+        
+        const opacity = Math.min(1, f.life / 10);
+        ctx.globalAlpha = opacity;
+        
+        // Main horizontal streak
+        const grad = ctx.createLinearGradient(-300, 0, 300, 0);
+        grad.addColorStop(0, 'rgba(0,0,0,0)');
+        grad.addColorStop(0.5, f.color);
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(-300, -2, 600, 4);
+        
+        // Center glow
+        const rad = ctx.createRadialGradient(0, 0, 0, 0, 0, 100);
+        rad.addColorStop(0, '#ffffff');
+        rad.addColorStop(0.2, f.color);
+        rad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = rad;
+        ctx.beginPath();
+        ctx.arc(0, 0, 100, 0, Math.PI*2);
+        ctx.fill();
 
-    // --- OSCILLOSCOPE (Screen Space) ---
+        ctx.restore();
+    });
+
+    // --- Speed Lines ---
+    if (Math.abs(player.vx) > 10 || player.isDashing) {
+         ctx.save();
+         // Screen Space Overlay
+         ctx.restore(); 
+         ctx.save();
+         ctx.strokeStyle = COLORS.speedLine;
+         ctx.lineWidth = 2;
+         for(let i=0; i<4; i++) {
+             const lx = Math.random() * width; 
+             const ly = Math.random() * height;
+             const len = Math.random() * 300 + 100;
+             ctx.beginPath();
+             ctx.moveTo(lx, ly);
+             ctx.lineTo(lx + len, ly);
+             ctx.globalAlpha = 0.2;
+             ctx.stroke();
+         }
+         ctx.restore();
+    } else {
+        ctx.restore(); // Pop main cam
+    }
+
+    // Restore Hit Flash Mode
+    if (player.hitFlashTimer > 0 || enemy.hitFlashTimer > 0) {
+        ctx.globalCompositeOperation = 'source-over';
+    }
+
+    // --- OSCILLOSCOPE ---
     if (audioRef.current && gameActive) {
         const bufferLength = audioRef.current.analyser.frequencyBinCount;
         const dataArray = new Uint8Array(bufferLength);
         audioRef.current.getWaveform(dataArray);
 
         ctx.lineWidth = 2;
-        ctx.strokeStyle = '#00ffaa';
+        ctx.strokeStyle = COLORS.gridHighlight; 
         ctx.shadowBlur = 10;
-        ctx.shadowColor = '#00ffaa';
-        ctx.globalAlpha = 0.5;
+        ctx.shadowColor = COLORS.gridHighlight;
+        ctx.globalAlpha = 0.6;
 
         ctx.beginPath();
         const sliceWidth = width * 1.0 / bufferLength;
@@ -950,14 +1177,13 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
 
         for(let i = 0; i < bufferLength; i++) {
             const v = dataArray[i] / 128.0;
-            const y = v * (height/10) + (height - 50); // Bottom 50px
+            const y = v * (height/20) + (height - 60); 
 
             if(i === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
 
             x += sliceWidth;
         }
-
         ctx.lineTo(width, height/2);
         ctx.stroke();
         ctx.globalAlpha = 1;
@@ -972,7 +1198,9 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
 
     const loop = () => {
       gameState.current.frameCount++;
-      gameState.current.shake *= 0.9;
+      gameState.current.shake *= 0.8;
+      gameState.current.shakeX *= 0.8; // Decay directional shake
+      gameState.current.shakeY *= 0.8;
       gameState.current.chromaticAberration *= 0.8;
       if (gameState.current.chromaticAberration < 0.5) gameState.current.chromaticAberration = 0;
 
@@ -996,7 +1224,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
       updateFighter(gameState.current.enemy, aiInput, gameState.current.player);
 
       checkCollisions();
-      updateParticlesAndWaves();
+      updateEffects();
 
       const ctx = canvasRef.current?.getContext('2d');
       if (ctx) draw(ctx);
@@ -1010,7 +1238,7 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
     return () => cancelAnimationFrame(animationFrameId);
   }, [gameActive, onGameOver]);
 
-  // UI Loop (Ghost Health Logic)
+  // UI Loop omitted for brevity (same as before)
   const hpPlayerRef = useRef<HTMLDivElement>(null);
   const hpPlayerGhostRef = useRef<HTMLDivElement>(null);
   const hpEnemyRef = useRef<HTMLDivElement>(null);
@@ -1022,37 +1250,23 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
      if (!gameActive) return;
      const uiLoop = () => {
          const { player, enemy } = gameState.current;
+         if (player.ghostHealth > player.health) player.ghostHealth -= 0.5; else player.ghostHealth = player.health;
+         if (enemy.ghostHealth > enemy.health) enemy.ghostHealth -= 0.5; else enemy.ghostHealth = enemy.health;
 
-         // Lerp Ghost Health
-         if (player.ghostHealth > player.health) {
-             player.ghostHealth -= 0.5; // slow drain
-         } else {
-             player.ghostHealth = player.health;
-         }
-
-         if (enemy.ghostHealth > enemy.health) {
-             enemy.ghostHealth -= 0.5; 
-         } else {
-             enemy.ghostHealth = enemy.health;
-         }
-
-         // Update Widths
          if (hpPlayerRef.current) hpPlayerRef.current.style.width = `${Math.max(0, player.health)}%`;
          if (hpPlayerGhostRef.current) hpPlayerGhostRef.current.style.width = `${Math.max(0, player.ghostHealth)}%`;
-
          if (hpEnemyRef.current) hpEnemyRef.current.style.width = `${Math.max(0, enemy.health)}%`;
          if (hpEnemyGhostRef.current) hpEnemyGhostRef.current.style.width = `${Math.max(0, enemy.ghostHealth)}%`;
 
-         // Shake UI if recently hit
          if (player.hitFlashTimer > 0 && hpContainerPlayerRef.current) {
-             const offset = Math.random() * 5;
+             const offset = Math.random() * 10;
              hpContainerPlayerRef.current.style.transform = `translate(${offset}px, ${offset}px)`;
          } else if (hpContainerPlayerRef.current) {
              hpContainerPlayerRef.current.style.transform = `none`;
          }
 
          if (enemy.hitFlashTimer > 0 && hpContainerEnemyRef.current) {
-             const offset = Math.random() * 5;
+             const offset = Math.random() * 10;
              hpContainerEnemyRef.current.style.transform = `translate(${offset}px, ${offset}px)`;
          } else if (hpContainerEnemyRef.current) {
              hpContainerEnemyRef.current.style.transform = `none`;
@@ -1065,34 +1279,31 @@ const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
   }, [gameActive]);
 
   return (
-    <div className="relative w-full h-full flex items-center justify-center bg-zinc-900">
+    <div className="relative w-full h-full flex items-center justify-center bg-black">
         <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none z-10">
             <div className="w-1/3">
                 <div className="flex justify-between text-cyan-400 font-bold mb-1 text-xl tracking-wider">
                     <span>PLAYER</span>
                 </div>
-                <div ref={hpContainerPlayerRef} className="h-6 w-full bg-gray-800 border-2 border-cyan-500 skew-x-[-15deg] overflow-hidden relative">
+                <div ref={hpContainerPlayerRef} className="h-6 w-full bg-gray-900/80 border-2 border-cyan-500 skew-x-[-15deg] overflow-hidden relative backdrop-blur-sm">
                     <div ref={hpPlayerGhostRef} className="absolute h-full bg-white transition-none" style={{ width: '100%', opacity: 0.5 }}></div>
                     <div ref={hpPlayerRef} className="absolute h-full bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)] transition-all duration-75 ease-out" style={{ width: '100%' }}></div>
                 </div>
             </div>
-            <div className="text-white text-4xl font-black italic tracking-widest text-shadow-neon">VS</div>
             <div className="w-1/3">
-                 <div className="flex justify-between text-rose-500 font-bold mb-1 text-xl tracking-wider flex-row-reverse">
+                 <div className="flex justify-between text-indigo-400 font-bold mb-1 text-xl tracking-wider flex-row-reverse">
                     <span>CPU</span>
                 </div>
-                <div ref={hpContainerEnemyRef} className="h-6 w-full bg-gray-800 border-2 border-rose-500 skew-x-[15deg] overflow-hidden relative">
+                <div ref={hpContainerEnemyRef} className="h-6 w-full bg-gray-900/80 border-2 border-indigo-500 skew-x-[15deg] overflow-hidden relative backdrop-blur-sm">
                      <div ref={hpEnemyGhostRef} className="absolute right-0 h-full bg-white transition-none" style={{ width: '100%', opacity: 0.5 }}></div>
-                     <div ref={hpEnemyRef} className="absolute right-0 h-full bg-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.8)] float-right transition-all duration-75 ease-out" style={{ width: '100%' }}></div>
+                     <div ref={hpEnemyRef} className="absolute right-0 h-full bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.8)] float-right transition-all duration-75 ease-out" style={{ width: '100%' }}></div>
                 </div>
             </div>
         </div>
-        <div className="absolute bottom-4 left-4 text-white/50 text-sm font-mono pointer-events-none">
+        <div className="absolute bottom-4 left-4 text-white/30 text-sm font-mono pointer-events-none">
             WASD/ZQSD: Move | SPACE: Dash | L-CLICK: 3-Hit Combo
         </div>
-        <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} className="w-full h-auto max-w-7xl border-2 border-slate-800 shadow-2xl bg-black" />
+        <canvas ref={canvasRef} width={CANVAS_WIDTH} height={CANVAS_HEIGHT} className="w-full h-auto max-w-7xl border border-blue-900/30 shadow-2xl bg-[#020205]" />
     </div>
   );
 };
-
-export default GameCanvas;

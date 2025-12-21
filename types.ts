@@ -27,6 +27,7 @@ export interface TrailPoint {
   y: number;
   scaleX: number;
   scaleY: number;
+  rotation: number; // For tilt
   facing: 1 | -1;
   alpha: number; // Opacity
   color: string;
@@ -41,6 +42,23 @@ export interface Shockwave {
   color: string;
   width: number; // Stroke width
   alpha: number;
+}
+
+export interface ImpactEffect {
+  id: string;
+  x: number;
+  y: number;
+  life: number;
+  color: string;
+  rotation: number;
+}
+
+export interface LensFlare {
+  id: string;
+  x: number;
+  y: number;
+  life: number;
+  color: string;
 }
 
 export interface AIState {
@@ -91,6 +109,7 @@ export interface Fighter {
   // Visuals / Feedback
   hitFlashTimer: number; // For white flash on hit
   isStunned: boolean; // Kept only for flag purposes, no logic blocking
+  rotation: number; // Body tilt
   
   // Timers
   dashTimer: number;
@@ -114,9 +133,22 @@ export interface GameState {
   enemy: Fighter;
   particles: Particle[];
   shockwaves: Shockwave[];
+  impacts: ImpactEffect[]; // Cross/Star lines
+  flares: LensFlare[]; // Cinematic finish
+
   shake: number; // Screen shake intensity
+  shakeX: number; // Directional shake X
+  shakeY: number; // Directional shake Y
+
   chromaticAberration: number; // Intensity of RGB split
   cameraZoom: number;
+  
+  // Camera Dynamics
+  cameraX: number;
+  cameraY: number;
+  cameraLookAhead: number;
+  cameraTilt: number;
+
   winner: 'player' | 'enemy' | null;
   gameActive: boolean;
   frameCount: number; // For flicker math
