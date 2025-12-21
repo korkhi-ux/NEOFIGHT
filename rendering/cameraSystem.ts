@@ -4,8 +4,6 @@ import { GameState, Fighter } from '../types';
 
 /**
  * Calcul les limites prédictives (Bounding Box) englobant tous les joueurs.
- * @param players Liste des combattants
- * @param lookaheadFrames Nombre de frames à anticiper (ex: 15 frames)
  */
 const getPredictiveBounds = (players: Fighter[], lookaheadFrames: number) => {
     let minX = Infinity, maxX = -Infinity;
@@ -20,11 +18,9 @@ const getPredictiveBounds = (players: Fighter[], lookaheadFrames: number) => {
         const predX = p.x + p.vx * lookaheadFrames;
         const predY = p.y + p.vy * lookaheadFrames;
 
-        // Limites du corps
         const w = p.width;
         const h = p.height;
 
-        // On étend la box pour inclure le présent ET le futur
         minX = Math.min(minX, currentX, predX);
         maxX = Math.max(maxX, currentX + w, predX + w);
         minY = Math.min(minY, currentY, predY);
@@ -37,106 +33,104 @@ const getPredictiveBounds = (players: Fighter[], lookaheadFrames: number) => {
 export const updateCamera = (gameState: GameState, viewportWidth: number, viewportHeight: number) => {
     const { player, enemy } = gameState;
     
-    // --- 1. LOGIQUE PRÉDICTIVE & VELOCITÉ ---
-    
-    // Détermine si le jeu est en mode "Haute Vitesse"
+    // --- 1. ANALYSE DE SITUATION ---
     const highSpeedAction = player.isGrappling || player.isDashing || Math.abs(player.vx) > 20 || Math.abs(enemy.vx) > 20;
-    
-    // Si haute vitesse, on regarde plus loin dans le futur
     const predictionFrames = highSpeedAction ? 20 : 10;
     const bounds = getPredictiveBounds([player, enemy], predictionFrames);
 
-    // --- 2. CALCUL DU ZOOM ADAPTATIF "SAFE ZONE" ---
-
-    // Padding Dynamique : Plus ça bouge vite, plus on laisse de marge sur les bords
+    // --- 2. CALCUL DU ZOOM "SAFE ZONE" ---
+    // On priorise la largeur pour le zoom de base
     const totalVelocity = Math.abs(player.vx) + Math.abs(player.vy) + Math.abs(enemy.vx) + Math.abs(enemy.vy);
-    const dynamicPadding = Math.min(300, totalVelocity * 5); // Cap padding
+    const dynamicPadding = Math.min(300, totalVelocity * 5); 
+    const basePaddingX = 350; 
     
-    const basePaddingX = 350; // Marge latérale minimum
-    const basePaddingY = 250; // Marge verticale minimum
+    // Width Target
+    const targetW = (bounds.maxX - bounds.minX) + (basePaddingX + dynamicPadding) * 2;
+    let targetZoom = viewportWidth / targetW;
 
-    const targetWidth = (bounds.maxX - bounds.minX) + (basePaddingX + dynamicPadding) * 2;
-    const targetHeight = (bounds.maxY - bounds.minY) + (basePaddingY + dynamicPadding) * 2;
+    // --- 3. IN-FRAME CHECK (SÉCURITÉ VERTICALE) ---
+    // On vérifie si les joueurs sont proches des bords verticaux avec le zoom actuel
+    // Si oui, on force le dézoom.
+    const paddingY_Critical = 100; // Marge minimale absolue (pixels écran)
+    const contentHeightWorld = (bounds.maxY - bounds.minY);
+    
+    // Hauteur visible en pixels monde avec le zoom calculé sur la largeur
+    let visibleWorldHeight = viewportHeight / targetZoom;
 
-    // Calcul du zoom idéal pour contenir cette target box
-    const zoomX = viewportWidth / targetWidth;
-    const zoomY = viewportHeight / targetHeight;
-    
-    // On prend le plus petit zoom (le plus dézoomé) pour être sûr que tout rentre
-    let targetZoom = Math.min(zoomX, zoomY);
-    
-    // Clamping
+    // Si le contenu vertical + marges dépasse ce qu'on peut voir, on dézoome
+    if (contentHeightWorld + (paddingY_Critical * 2 / targetZoom) > visibleWorldHeight) {
+        // Recalcul du zoom basé sur la hauteur nécessaire
+        // On veut que : contentHeightWorld * newZoom + margins < viewportHeight
+        const neededHeight = contentHeightWorld; // Padding géré par le ratio
+        // On laisse environ 20% de marge totale (10% haut, 10% bas)
+        targetZoom = Math.min(targetZoom, (viewportHeight * 0.8) / neededHeight);
+    }
+
+    // Clamping final
     targetZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, targetZoom));
 
-    // --- 3. INTELLIGENT SMOOTHING (Non-Linéaire) ---
+    // --- 4. POSITION VERTICALE (GROUND ANCHOR vs ELEVATION) ---
+    
+    const currentViewH = viewportHeight / targetZoom; // Hauteur du viewport en unités monde pour le target
+    
+    // A. Ancre de sol : Le sol est à 85% de l'écran vers le bas.
+    // CamY = GroundY - (85% de la vue)
+    const groundAnchorY = GROUND_Y - (currentViewH * 0.85);
 
-    // Par défaut, smoothing fluide
-    let smoothing = 0.08;
+    // B. Élévation Dynamique : Où sont les joueurs ?
+    const playersMidY = (bounds.minY + bounds.maxY) / 2;
+    
+    // Seuil de décollage : Si le milieu des joueurs dépasse 300px au dessus du sol
+    const airThreshold = GROUND_Y - 300; 
 
-    // Si action rapide, la caméra devient "nerveuse" et colle à l'action
-    if (highSpeedAction) {
-        smoothing = 0.25; 
+    let targetCamY = groundAnchorY;
+
+    if (playersMidY < airThreshold) {
+        // Les joueurs volent haut. On passe en mode "Centrage Vertical"
+        // On centre la caméra sur les joueurs
+        const centerTargetY = playersMidY - (currentViewH / 2);
+        
+        // On choisit la position la plus haute (valeur Y la plus faible) entre l'ancre et le centrage
+        // Cela permet une transition naturelle : tant que le centrage est plus bas que l'ancre, l'ancre gagne.
+        targetCamY = Math.min(groundAnchorY, centerTargetY);
     }
 
-    // Si on est très loin de la cible (retard important), on accélère drastiquement
-    const zoomDiff = Math.abs(targetZoom - gameState.cameraZoom);
-    if (zoomDiff > 0.5) smoothing = 0.3; // Catch up fast on zoom
+    // Clamp bas : Ne jamais descendre sous l'ancre de sol (on ne veut pas voir sous la map)
+    targetCamY = Math.min(targetCamY, groundAnchorY);
+    // Clamp haut : Plafond max
+    targetCamY = Math.max(-3000, targetCamY);
 
-    // Application du Zoom
-    gameState.cameraZoom += (targetZoom - gameState.cameraZoom) * smoothing;
-
-    // --- 4. CENTRAGE & ANCRAGE SOL ---
-
-    const currentZoom = gameState.cameraZoom;
-    const viewW = viewportWidth / currentZoom;
-    const viewH = viewportHeight / currentZoom;
-
-    // Centre géométrique de la Bounding Box
+    // --- 5. POSITION HORIZONTALE (CENTRAGE STANDARD) ---
+    const currentViewW = viewportWidth / targetZoom;
     const boxCenterX = (bounds.minX + bounds.maxX) / 2;
-    const boxCenterY = (bounds.minY + bounds.maxY) / 2;
-
-    let targetCamX = boxCenterX - viewW / 2;
-    let targetCamY = boxCenterY - viewH / 2;
-
-    // --- 5. BOUNDARY CHECK & GROUND ANCHOR ---
+    let targetCamX = boxCenterX - currentViewW / 2;
     
-    // Clamp Horizontal (Ne pas sortir du monde)
-    targetCamX = Math.max(0, Math.min(targetCamX, WORLD_WIDTH - viewW));
+    // Clamp Monde
+    targetCamX = Math.max(0, Math.min(targetCamX, WORLD_WIDTH - currentViewW));
 
-    // Clamp Vertical (Ne pas voir sous le sol)
-    // Mais permettre de voir très haut dans le ciel
-    // Ground Anchor : Si l'action est proche du sol, on s'assure que le bas de l'écran n'est pas trop haut
-    const maxCamY = GROUND_Y + 150 - viewH; // Laisse un peu de marge sous le sol
-    targetCamY = Math.min(targetCamY, maxCamY);
-    
-    // Hard Limit ciel : pour éviter de perdre les repères (optionnel, mis à -4000)
-    targetCamY = Math.max(-4000, targetCamY);
+    // --- 6. LISSAGE ET APPLICATION ---
 
-    // --- 6. URGENCE (EMERGENCY FRAMING) ---
-    // Vérification finale : Si un joueur est sur le point de sortir de l'écran malgré le lissage
-    // On force la position (Snap partiel)
-    
-    // Conversion World -> Screen pour vérifier
-    const pScreenX = (player.x - targetCamX) * currentZoom;
-    const pScreenY = (player.y - targetCamY) * currentZoom;
-    
-    const margin = 50; // 50px de marge critique
-    const isCritical = 
-        pScreenX < margin || pScreenX > viewportWidth - margin ||
-        pScreenY < margin || pScreenY > viewportHeight - margin;
+    let smoothing = highSpeedAction ? 0.2 : 0.08;
 
-    if (isCritical) {
-        smoothing = 0.5; // Très rapide pour corriger l'urgence
+    // Urgence : Si on est très loin du target zoom (changement brusque de distance), on accélère
+    if (Math.abs(targetZoom - gameState.cameraZoom) > 0.2) {
+        smoothing = 0.15;
     }
 
-    // Application Position
-    gameState.cameraX += (targetCamX - gameState.cameraX) * smoothing;
-    gameState.cameraY += (targetCamY - gameState.cameraY) * smoothing;
+    // STABILISATION DE DÉPART (Frame 1-5)
+    if (gameState.frameCount < 5) {
+        gameState.cameraZoom = 1.0; // Force start zoom
+        // Recalcul simple pour frame 1
+        gameState.cameraX = boxCenterX - (viewportWidth / 1.0) / 2;
+        gameState.cameraY = GROUND_Y - (viewportHeight / 1.0) * 0.85;
+    } else {
+        gameState.cameraZoom += (targetZoom - gameState.cameraZoom) * smoothing;
+        gameState.cameraX += (targetCamX - gameState.cameraX) * smoothing;
+        gameState.cameraY += (targetCamY - gameState.cameraY) * smoothing;
+    }
 
-    // --- 7. TILT DYNAMIQUE ---
-    const targetTilt = (player.vx / MAX_SPEED) * 0.02; // Léger tilt
+    // --- 7. TILT ---
+    const targetTilt = (player.vx / MAX_SPEED) * 0.015;
     gameState.cameraTilt += (targetTilt - gameState.cameraTilt) * 0.1;
-    
-    // Pas de LookAhead artificiel ici, la bounding box prédictive s'en charge mieux
-    gameState.cameraLookAhead = 0; 
+    gameState.cameraLookAhead = 0;
 };
