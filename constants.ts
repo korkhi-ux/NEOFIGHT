@@ -106,7 +106,7 @@ export const CAMERA_LOOKAHEAD = 150;
 export const CAMERA_TILT_MAX = 0.015;
 
 // Slinger Mechanics
-export const GRAPPLE_COOLDOWN = 45; // Frames (Reduced slightly for better flow)
+export const GRAPPLE_COOLDOWN = 180; // 3 Seconds @ 60 FPS
 export const GRAPPLE_MAX_SPEED = 45; // FLASH SPEED
 export const GRAPPLE_RANGE = WORLD_WIDTH; // Infinite Range
 

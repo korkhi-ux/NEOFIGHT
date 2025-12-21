@@ -66,25 +66,24 @@ export const updateFighter = (
     if (f.classType === 'SLINGER') {
         
         // 1. CANCEL / RELEASE (Slingshot Effect)
-        // If button pressed again OR button released (optional style, here we use toggle behavior on press)
         if (freshSpecial && f.isGrappling) {
             f.isGrappling = false;
             f.grapplePoint = null;
             f.grappleTargetId = null;
-            f.grappleCooldownTimer = GRAPPLE_COOLDOWN; // Trigger Cooldown ON RELEASE
+            f.grappleCooldownTimer = GRAPPLE_COOLDOWN; 
             
             // SLINGSHOT BOOST: Preserve and amplify momentum
             f.vx *= 1.2; 
             f.vy *= 1.2;
             
-            // Visual Pop
             createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.glow);
         }
         // 2. FIRE (Raycast) - Air or Ground
         else if (freshSpecial && !f.isGrappling && f.grappleCooldownTimer <= 0) {
             
             const originX = f.x + f.width / 2;
-            const originY = f.y + f.height / 3; 
+            // CENTER OF CHEST (Aligned with blade attacks)
+            const originY = f.y + f.height * 0.55; 
             
             // Horizontal shot with slight angle
             const angleRad = (f.facing === 1 ? 0.1 : Math.PI - 0.1); 
@@ -94,11 +93,9 @@ export const updateFighter = (
             let hitPoint: {x: number, y: number} | null = null;
             let hitTargetId: string | null = null;
             
-            // A. Check Enemy Hit (Priority)
+            // A. Check Enemy Hit
             const distOpp = Math.sqrt(Math.pow(opponent.x - f.x, 2) + Math.pow(opponent.y - f.y, 2));
-            // Can hit enemy anywhere in range, auto-aim slight assist
             const inRange = distOpp < GRAPPLE_RANGE;
-            // Check if roughly in front
             const dxOpp = opponent.x - f.x;
             const inFront = Math.sign(dxOpp) === f.facing;
 
@@ -106,14 +103,12 @@ export const updateFighter = (
                 hitPoint = { x: opponent.x + opponent.width/2, y: opponent.y + opponent.height/2 };
                 hitTargetId = opponent.id;
             } 
-            // B. Check Walls (Secondary)
+            // B. Check Walls
             else {
                 const targetWallX = f.facing === 1 ? WORLD_WIDTH : 0;
                 const distToWallX = targetWallX - originX;
                 
-                // Infinite range basically hits walls always
                 hitPoint = { x: targetWallX, y: originY + (distToWallX * Math.tan(angleRad)) };
-                // Clamp Y
                 if (hitPoint.y > GROUND_Y) hitPoint.y = GROUND_Y;
             }
 
@@ -123,22 +118,18 @@ export const updateFighter = (
                 f.grappleTargetId = hitTargetId;
                 f.isGrounded = false;
                 
-                // Visuals
                 createShockwave(gameState, hitPoint.x, hitPoint.y, f.color.glow);
                 createParticles(gameState, hitPoint.x, hitPoint.y, 12, f.color.glow, 8);
                 
-                // Initial kick (Recoil/Launch)
-                f.vx += dirX * 2; 
-                f.vy -= 5; // Little hop
+                f.vx += dirX * 5; // Stronger initial kick
+                f.vy -= 8; // Hop
             } else {
-                // Whiff
                 f.grappleCooldownTimer = 15; 
             }
         } 
         
         // 3. UPDATE PHYSICS (While grappling)
         else if (f.isGrappling && f.grapplePoint) {
-            // Update point if locked to enemy
             if (f.grappleTargetId) {
                 f.grapplePoint = { 
                     x: opponent.x + opponent.width/2, 
@@ -151,25 +142,21 @@ export const updateFighter = (
             const dist = Math.sqrt(dx*dx + dy*dy);
 
             if (dist < 50) {
-                // Arrived (Snap & Release)
                 f.isGrappling = false;
                 f.grapplePoint = null;
                 f.grappleTargetId = null;
-                f.grappleCooldownTimer = GRAPPLE_COOLDOWN; // Trigger Cooldown
+                f.grappleCooldownTimer = GRAPPLE_COOLDOWN; 
                 
-                // Keep momentum but cap slightly to avoid glitching through world
                 f.vx *= 0.8; 
                 f.vy *= 0.8;
             } else {
-                // EXTREME ELASTIC PULL (Exponential)
-                // The pull force is constant + distance factor, creating "Zip"
-                const pullForce = 2.5 * timeScale; // Violent pull
+                // EXTREME ELASTIC PULL - ZIP EFFECT
+                const pullForce = 4.0 * timeScale; // Violent pull
                 const angle = Math.atan2(dy, dx);
                 
                 f.vx += Math.cos(angle) * pullForce;
                 f.vy += Math.sin(angle) * pullForce;
                 
-                // Cap speed check
                 const speed = Math.sqrt(f.vx*f.vx + f.vy*f.vy);
                 if (speed > GRAPPLE_MAX_SPEED) {
                     const r = GRAPPLE_MAX_SPEED / speed;
@@ -203,7 +190,6 @@ export const updateFighter = (
 
     // --- Action Logic ---
     
-    // Dash
     if (input.dash && f.dashCooldown <= 0) {
       if (f.isGrappling) {
           f.isGrappling = false;
@@ -212,7 +198,6 @@ export const updateFighter = (
           f.grappleCooldownTimer = GRAPPLE_COOLDOWN;
       }
       f.isAttacking = false;
-
       f.isDashing = true;
       f.dashTimer = stats.dashDuration;
       f.dashCooldown = stats.dashCooldown;
@@ -220,26 +205,22 @@ export const updateFighter = (
       
       const dashDir = input.x !== 0 ? Math.sign(input.x) : f.facing;
       f.facing = dashDir as 1 | -1;
-      
       f.scaleX = 1.7; 
       f.scaleY = 0.4; 
       gameState.shake += 2;
     }
 
-    // Jump
     if (input.jump && (f.isGrounded || (f.classType === 'SLINGER' && f.isGrappling))) {
        if (f.isGrappling) {
            f.isGrappling = false;
            f.grapplePoint = null;
            f.grappleTargetId = null;
            f.grappleCooldownTimer = GRAPPLE_COOLDOWN;
-           // Jump boost out of grapple
            f.vy = stats.jumpForce * 1.2; 
            f.vx *= 1.1; 
        } else {
            f.vy = stats.jumpForce;
        }
-       
        f.isAttacking = false;
        f.isGrounded = false;
        f.scaleX = 0.6;
@@ -248,7 +229,6 @@ export const updateFighter = (
        audio?.playJump();
     }
 
-    // Attack
     if (freshAttack && !f.isDashing) {
         if (f.isGrappling) {
              f.isGrappling = false;
@@ -272,11 +252,9 @@ export const updateFighter = (
             } else {
                 f.comboCount = 0;
             }
-            
             f.isAttacking = true;
             f.attackTimer = ATTACK_DURATIONS[f.comboCount];
             f.comboTimer = COMBO_WINDOW; 
-            
             f.scaleX = 1.3;
             f.scaleY = 0.8;
             
@@ -291,12 +269,10 @@ export const updateFighter = (
         }
     }
     
-    // Physics Update
     if (f.isDashing) {
       f.dashTimer -= timeScale;
       f.vx = f.facing * stats.dashSpeed;
       f.vy = 0; 
-
       if (f.dashTimer <= 0) {
         f.isDashing = false;
         f.vx *= 0.5;
@@ -306,7 +282,6 @@ export const updateFighter = (
         f.attackTimer -= timeScale;
         if (f.isGrounded) f.vx *= 0.85;
         else f.vx *= 0.95;
-
         if (f.attackTimer <= 0) {
             f.isAttacking = false;
             f.attackCooldown = ATTACK_COOLDOWN; 
@@ -316,22 +291,15 @@ export const updateFighter = (
         }
     }
     else {
-        // Normal Movement (Modified if grappling)
         if (!f.isGrappling) {
             const accel = f.isGrounded ? stats.speed : stats.speed * 0.8;
             f.vx += input.x * accel * timeScale; 
-
             if (Math.abs(f.vx) > stats.maxSpeed) f.vx = Math.sign(f.vx) * stats.maxSpeed;
-
-            if (input.x === 0) {
-            f.vx *= (f.isGrounded ? FRICTION : AIR_RESISTANCE);
-            }
+            if (input.x === 0) f.vx *= (f.isGrounded ? FRICTION : AIR_RESISTANCE);
         }
     }
 
-    // Apply Gravity (Scaled by class, and disabled during dash)
     if (!f.isDashing) {
-        // While grappling, almost NO gravity to allow "Straight line" zip
         const gMult = f.isGrappling ? 0.05 : stats.gravityScale;
         f.vy += GRAVITY * gMult * timeScale;
     }
@@ -339,20 +307,16 @@ export const updateFighter = (
     f.x += f.vx * timeScale;
     f.y += f.vy * timeScale;
 
-    // Collision with ground/walls
     if (f.y + f.height >= GROUND_Y) {
       f.y = GROUND_Y - f.height;
       if (!f.isGrappling) {
           f.vy = 0;
           f.isGrounded = true;
-      } else {
-          // Slide on ground if grappling
-      }
+      } 
     } else {
         f.isGrounded = false;
     }
 
-    // --- Wall Physics ---
     if (f.x < 0) { 
         if (f.vx < -5) {
             createParticles(gameState, 0, f.y + f.height/2, 5, '#ffffff', 5);
@@ -360,11 +324,11 @@ export const updateFighter = (
         }
         f.x = 0; 
         f.vx = 0; 
-        if (f.isGrappling) { // Release if hit wall
+        if (f.isGrappling) {
             f.isGrappling = false;
             f.grapplePoint = null;
             f.grappleTargetId = null;
-            f.grappleCooldownTimer = GRAPPLE_COOLDOWN; // Cooldown on crash
+            f.grappleCooldownTimer = GRAPPLE_COOLDOWN; 
         }
     }
     if (f.x + f.width > WORLD_WIDTH) { 
@@ -386,15 +350,14 @@ export const updateFighter = (
       f.facing = Math.sign(input.x) as 1 | -1;
     }
 
-    // Animation Spring
     f.scaleX += (1 - f.scaleX) * 0.15 * timeScale;
     f.scaleY += (1 - f.scaleY) * 0.15 * timeScale;
 
-    // Lean
     if (Math.abs(f.vx) < 1.0) {
         f.rotation *= 0.7; 
     } else {
-        const leanAmount = f.isGrappling ? 1.5 : 0.25; // Massive lean when zipping
+        // REDUCED LEAN AMOUNT FOR STABILITY
+        const leanAmount = f.isGrappling ? 0.4 : 0.25; 
         const targetRot = (f.vx / stats.maxSpeed) * leanAmount; 
         f.rotation += (targetRot - f.rotation) * 0.2 * timeScale;
     }
