@@ -5,7 +5,7 @@ import { useGameLoop } from '../hooks/useGameLoop';
 import { HUD } from './HUD';
 
 interface GameCanvasProps {
-  onGameOver: (winner: 'player' | 'enemy') => void;
+  onGameOver: (winner: 'player' | 'enemy', pScore: number, eScore: number) => void;
   onRestart: () => void;
   gameActive: boolean;
 }
@@ -18,8 +18,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }
     <div className="relative w-full h-full flex items-center justify-center bg-black">
         <HUD gameStateRef={gameStateRef} gameActive={gameActive} />
         
-        <div className="absolute bottom-4 left-4 text-white/30 text-sm font-mono pointer-events-none">
-            WASD/ZQSD: Move | SPACE: Dash | L-CLICK: 3-Hit Combo
+        <div className="absolute bottom-4 left-4 text-white/30 text-xs font-mono pointer-events-none flex gap-4">
+            <span>[ WASD/ZQSD ] MOVE</span>
+            <span>[ SPACE ] DASH</span>
+            <span>[ L-CLICK ] ATTACK</span>
         </div>
         
         <canvas 

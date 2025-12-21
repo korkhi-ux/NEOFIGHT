@@ -57,11 +57,16 @@ const createFighter = (id: 'player' | 'enemy', x: number, colorSet: typeof COLOR
 export const useGameLoop = (
     canvasRef: React.RefObject<HTMLCanvasElement>,
     gameActive: boolean,
-    onGameOver: (winner: 'player' | 'enemy') => void
+    onGameOver: (winner: 'player' | 'enemy', pScore: number, eScore: number) => void
 ) => {
     const inputManager = useRef(new InputManager());
     const audioManager = useRef<AudioManager | null>(null);
     const prevAttackInput = useRef<{ [key: string]: boolean }>({});
+    
+    // Keep scores persistent across rounds in current ref if needed, 
+    // but here we just re-initialize fighters. 
+    // If we want persistent scores we should grab them from previous state.
+    // However, the requested flow is to pass scores OUT.
     
     const gameState = useRef<GameState>({
         player: createFighter('player', 200, COLORS.player),
@@ -93,11 +98,15 @@ export const useGameLoop = (
         if (!audioManager.current) audioManager.current = new AudioManager();
         audioManager.current.resume();
 
+        // Preserve Scores when restarting
+        const currentPScore = gameState.current.player.score;
+        const currentEScore = gameState.current.enemy.score;
+
         // Reset State
         gameState.current = {
             ...gameState.current,
-            player: createFighter('player', 200, COLORS.player),
-            enemy: createFighter('enemy', WORLD_WIDTH - 250, COLORS.enemy),
+            player: { ...createFighter('player', 200, COLORS.player), score: currentPScore },
+            enemy: { ...createFighter('enemy', WORLD_WIDTH - 250, COLORS.enemy), score: currentEScore },
             gameActive: true,
             winner: null,
             slowMoFactor: 1.0,

@@ -4,7 +4,11 @@ import { Fighter, GameState } from '../types';
 import { AudioManager } from '../core/AudioManager';
 import { createImpact, createParticles, createShockwave, createFlare } from './effectSpawners';
 
-export const checkCollisions = (gameState: GameState, audio: AudioManager | null, onGameOver: (winner: 'player' | 'enemy') => void) => {
+export const checkCollisions = (
+    gameState: GameState, 
+    audio: AudioManager | null, 
+    onGameOver: (winner: 'player' | 'enemy', playerScore: number, enemyScore: number) => void
+) => {
     const { player, enemy } = gameState;
 
     const checkHit = (attacker: Fighter, defender: Fighter) => {
@@ -44,7 +48,7 @@ const handleHit = (
     defender: Fighter, 
     gameState: GameState, 
     audio: AudioManager | null, 
-    onGameOver: (winner: 'player' | 'enemy') => void
+    onGameOver: (winner: 'player' | 'enemy', pScore: number, eScore: number) => void
 ) => {
     if (defender.isDashing) return; 
 
@@ -99,6 +103,9 @@ const handleHit = (
         
         audio?.playKO();
 
-        setTimeout(() => onGameOver(attacker.id), 3000); 
+        const pScore = (attacker.id === 'player' ? attacker.score : defender.score);
+        const eScore = (attacker.id === 'enemy' ? attacker.score : defender.score);
+
+        setTimeout(() => onGameOver(attacker.id, pScore, eScore), 3000); 
     }
 };

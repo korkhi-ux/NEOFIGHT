@@ -71,7 +71,7 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
 
     // --- ANIME NEEDLE BLADES (Attacks) ---
     if (f.isAttacking) {
-        // 1. Alignement de Hauteur Fixe : Centre du buste
+        // 1. Alignement de Hauteur Fixe : Centre du buste (55% height)
         ctx.translate(0, -bodyH * 0.55);
 
         // 5. Rendu Cristallin : Mode 'lighter' et netteté absolue
@@ -80,28 +80,29 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
 
         // Params
         const bladeColor = f.color.glow; 
-        const jitter = Math.sin(gameState.frameCount * 0.8) * 0.05;
+        const jitter = Math.sin(gameState.frameCount * 0.8) * 0.02; // Reduced jitter for stability
 
-        // 4. Dynamique d'Attaque Longue
+        // 4. Dynamique d'Attaque Horizontale (Max +/- 15 degrees)
+        // 15 degrees is approx 0.26 radians
         let baseAngle = 0;
-        let bladeLength = 250;
-        let bladeThickness = 12; // Very thin relative to length
+        let bladeLength = 280;
+        let bladeThickness = 12; // Needle thin
 
         if (f.comboCount === 0) {
-            // Diagonal Slash
-            baseAngle = Math.PI / 4; 
-            bladeLength = 250;
-            bladeThickness = 15;
-        } else if (f.comboCount === 1) {
-            // Wide Angle Slash
-            baseAngle = -Math.PI / 6; 
+            // Step 1: Slight Upward Slash (10 degrees)
+            baseAngle = -0.18; 
             bladeLength = 280;
-            bladeThickness = 18;
+            bladeThickness = 14;
+        } else if (f.comboCount === 1) {
+            // Step 2: Slight Downward Slash (10 degrees)
+            baseAngle = 0.18; 
+            bladeLength = 300;
+            bladeThickness = 16;
         } else {
-            // Finisher: Screen Zebra
+            // Step 3 (Finisher): Perfectly Horizontal Pierce
             baseAngle = 0;
-            bladeLength = 500; 
-            bladeThickness = 25;
+            bladeLength = 550; // Screen clearing length
+            bladeThickness = 22;
         }
 
         // Apply Symmetry
@@ -117,10 +118,10 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
 
             // Top Curve (Quadratic for sharp needle shape)
             // Control point is mid-length but pulled out to thickness
-            ctx.quadraticCurveTo(len * 0.5, -thick, len, 0);
+            ctx.quadraticCurveTo(len * 0.4, -thick, len, 0);
 
             // Bottom Curve
-            ctx.quadraticCurveTo(len * 0.5, thick, 0, 0);
+            ctx.quadraticCurveTo(len * 0.4, thick, 0, 0);
 
             ctx.fillStyle = color;
             ctx.globalAlpha = alpha;
@@ -131,21 +132,21 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
         // Using a gradient for the outer blade to feel like light fading
         const grad = ctx.createLinearGradient(0, 0, bladeLength, 0);
         grad.addColorStop(0, bladeColor);
-        grad.addColorStop(0.5, bladeColor);
+        grad.addColorStop(0.3, bladeColor);
         grad.addColorStop(1, 'rgba(0,0,0,0)'); // Fade tip
         
         // Custom draw with gradient logic inline for the outer shell to support gradient
         ctx.beginPath();
         ctx.moveTo(0, 0);
-        ctx.quadraticCurveTo(bladeLength * 0.5, -bladeThickness, bladeLength, 0);
-        ctx.quadraticCurveTo(bladeLength * 0.5, bladeThickness, 0, 0);
+        ctx.quadraticCurveTo(bladeLength * 0.4, -bladeThickness, bladeLength, 0);
+        ctx.quadraticCurveTo(bladeLength * 0.4, bladeThickness, 0, 0);
         ctx.fillStyle = grad;
         ctx.globalAlpha = 0.8;
         ctx.fill();
 
         // Pass 2: Inner Core (White, Thinner, Sharper)
         // No gradient, pure hot white
-        drawNeedle(bladeLength * 0.95, bladeThickness * 0.3, '#ffffff', 1.0);
+        drawNeedle(bladeLength * 0.95, bladeThickness * 0.25, '#ffffff', 1.0);
 
         ctx.restore(); // Restore facing/rotation
 

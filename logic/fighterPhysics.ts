@@ -200,8 +200,23 @@ export const updateFighter = (
         f.isGrounded = false;
     }
 
-    if (f.x < 0) { f.x = 0; f.vx = 0; }
-    if (f.x + f.width > WORLD_WIDTH) { f.x = WORLD_WIDTH - f.width; f.vx = 0; }
+    // --- Wall Physics with Particle Effect ---
+    if (f.x < 0) { 
+        if (f.vx < -5) {
+            createParticles(gameState, 0, f.y + f.height/2, 5, '#ffffff', 5);
+            f.scaleX = 0.8; // Squash against wall
+        }
+        f.x = 0; 
+        f.vx = 0; 
+    }
+    if (f.x + f.width > WORLD_WIDTH) { 
+        if (f.vx > 5) {
+            createParticles(gameState, WORLD_WIDTH, f.y + f.height/2, 5, '#ffffff', 5);
+            f.scaleX = 0.8; // Squash against wall
+        }
+        f.x = WORLD_WIDTH - f.width; 
+        f.vx = 0; 
+    }
 
     if (input.x !== 0 && !f.isDashing && !f.isAttacking) {
       f.facing = Math.sign(input.x) as 1 | -1;

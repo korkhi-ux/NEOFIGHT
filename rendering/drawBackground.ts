@@ -30,12 +30,15 @@ export const drawBackground = (ctx: CanvasRenderingContext2D, gameState: GameSta
 
     // Floor Grid
     ctx.lineWidth = 2;
+    // Ensure grid covers the entire world width completely from 0
     const startX = Math.floor(camX / 100) * 100;
     const endX = Math.min(WORLD_WIDTH, camX + viewW + 100);
     const startY = GROUND_Y;
     const endY = GROUND_Y + 300;
 
     for (let x = startX; x <= endX; x += 100) {
+        if (x < 0 || x > WORLD_WIDTH) continue; // Clip grid
+        
         for (let y = startY; y <= endY; y += 100) {
             const centerX = x + 50;
             const distToP = Math.abs(centerX - player.x);
@@ -60,6 +63,7 @@ export const drawBackground = (ctx: CanvasRenderingContext2D, gameState: GameSta
     }
     ctx.globalAlpha = 1.0;
     
+    // Horizon Line
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 3;
     ctx.shadowBlur = 15;
@@ -68,5 +72,33 @@ export const drawBackground = (ctx: CanvasRenderingContext2D, gameState: GameSta
     ctx.moveTo(0, GROUND_Y);
     ctx.lineTo(WORLD_WIDTH, GROUND_Y);
     ctx.stroke();
-    ctx.shadowBlur = 0;
+
+    // --- NEON WALLS (Borders) ---
+    ctx.save();
+    ctx.lineWidth = 2;
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = '#00ffff'; // Electric Blue Glow
+    ctx.strokeStyle = '#ffffff';
+
+    // Left Wall
+    ctx.beginPath();
+    ctx.moveTo(2, GROUND_Y);
+    ctx.lineTo(2, GROUND_Y - 1000); // Go way up
+    ctx.stroke();
+    
+    // Left Wall Glow Effect
+    ctx.fillStyle = 'rgba(0, 255, 255, 0.1)';
+    ctx.fillRect(0, GROUND_Y - 1000, 20, 1000);
+
+    // Right Wall
+    ctx.beginPath();
+    ctx.moveTo(WORLD_WIDTH - 2, GROUND_Y);
+    ctx.lineTo(WORLD_WIDTH - 2, GROUND_Y - 1000);
+    ctx.stroke();
+
+    // Right Wall Glow Effect
+    ctx.fillStyle = 'rgba(0, 255, 255, 0.1)';
+    ctx.fillRect(WORLD_WIDTH - 20, GROUND_Y - 1000, 20, 1000);
+    
+    ctx.restore();
 };
