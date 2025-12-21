@@ -1,12 +1,14 @@
 
 import React, { useState } from 'react';
 import { GameCanvas } from './components/GameCanvas';
-import { Play, RotateCcw, Keyboard, Sword } from 'lucide-react';
+import { Play, RotateCcw, Keyboard, Sword, Shield, Zap, Wind, Anchor } from 'lucide-react';
+import { FighterClass } from './types';
 
 export default function App() {
   const [gameState, setGameState] = useState<'menu' | 'playing' | 'gameover'>('menu');
   const [winner, setWinner] = useState<'player' | 'enemy' | null>(null);
   const [scores, setScores] = useState({ player: 0, enemy: 0 });
+  const [selectedClass, setSelectedClass] = useState<FighterClass>('STANDARD');
 
   const startGame = () => {
     setGameState('playing');
@@ -82,6 +84,21 @@ export default function App() {
             box-shadow: 0 2px 0 rgba(0, 255, 255, 0.2);
             font-size: 10px;
         }
+        
+        .class-btn {
+            background: rgba(0,0,0,0.8);
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.2s;
+        }
+        .class-btn:hover {
+            border-color: rgba(0,255,255,0.5);
+            background: rgba(0,255,255,0.1);
+        }
+        .class-btn.active {
+            border-color: #00ffff;
+            background: rgba(0,255,255,0.2);
+            box-shadow: 0 0 15px rgba(0,255,255,0.3);
+        }
       `}</style>
       
       {/* GLOBAL HUD OVERLAY */}
@@ -117,13 +134,37 @@ export default function App() {
           {/* Heavy Overlay Vignette */}
           <div className="absolute inset-0 bg-[radial-gradient(circle,rgba(0,0,0,0)0%,rgba(0,0,0,0.8)100%)] pointer-events-none"></div>
 
-          <div className="text-center relative z-10 mb-12">
+          <div className="text-center relative z-10 mb-8">
             <h1 className="text-9xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-cyan-400 to-indigo-600 italic transform -skew-x-12 filter drop-shadow-[0_0_20px_rgba(0,100,255,0.6)] glitch-text">
               NEON BLITZ
             </h1>
             <p className="text-2xl text-blue-200 mt-6 font-mono tracking-[0.8em] opacity-80 uppercase">
                  Cyber Duel Protocol
             </p>
+          </div>
+
+          {/* CLASS SELECTOR */}
+          <div className="z-10 flex gap-4 mb-12">
+               <button onClick={() => setSelectedClass('STANDARD')} className={`class-btn flex flex-col items-center p-4 w-32 ${selectedClass === 'STANDARD' ? 'active' : ''}`}>
+                   <Sword className="w-8 h-8 text-cyan-400 mb-2"/>
+                   <span className="text-xs font-bold text-white tracking-widest">STANDARD</span>
+                   <span className="text-[9px] text-white/50 mt-1">BALANCED</span>
+               </button>
+               <button onClick={() => setSelectedClass('SLINGER')} className={`class-btn flex flex-col items-center p-4 w-32 ${selectedClass === 'SLINGER' ? 'active' : ''}`}>
+                   <Wind className="w-8 h-8 text-yellow-400 mb-2"/>
+                   <span className="text-xs font-bold text-white tracking-widest">SLINGER</span>
+                   <span className="text-[9px] text-white/50 mt-1">SPEED / AGILE</span>
+               </button>
+               <button onClick={() => setSelectedClass('VORTEX')} className={`class-btn flex flex-col items-center p-4 w-32 ${selectedClass === 'VORTEX' ? 'active' : ''}`}>
+                   <Zap className="w-8 h-8 text-purple-400 mb-2"/>
+                   <span className="text-xs font-bold text-white tracking-widest">VORTEX</span>
+                   <span className="text-[9px] text-white/50 mt-1">FLOATY / TECH</span>
+               </button>
+               <button onClick={() => setSelectedClass('HEAVY')} className={`class-btn flex flex-col items-center p-4 w-32 ${selectedClass === 'HEAVY' ? 'active' : ''}`}>
+                   <Shield className="w-8 h-8 text-red-400 mb-2"/>
+                   <span className="text-xs font-bold text-white tracking-widest">HEAVY</span>
+                   <span className="text-[9px] text-white/50 mt-1">TANK / SLOW</span>
+               </button>
           </div>
           
           <button 
@@ -204,6 +245,7 @@ export default function App() {
             gameActive={gameState === 'playing'} 
             onGameOver={handleGameOver} 
             onRestart={startGame}
+            playerClass={selectedClass}
         />
       </div>
     </div>

@@ -1,9 +1,12 @@
 
+import { FighterClass } from './types';
+
 export const CANVAS_WIDTH = 1280; // Viewport Width
 export const CANVAS_HEIGHT = 720;
 export const WORLD_WIDTH = 2560; // The actual map size (Double the viewport)
 export const GROUND_Y = 600;
 
+// Base Physics Constants (Used as default for STANDARD class)
 export const GRAVITY = 0.8;
 export const FRICTION = 0.85;
 export const AIR_RESISTANCE = 0.95;
@@ -14,6 +17,61 @@ export const JUMP_FORCE = -22;
 export const DASH_SPEED = 32; 
 export const DASH_DURATION = 9; 
 export const DASH_COOLDOWN = 25; 
+
+// Class System Configuration
+interface ClassStats {
+    speed: number;
+    maxSpeed: number;
+    jumpForce: number;
+    dashSpeed: number;
+    dashDuration: number;
+    dashCooldown: number;
+    health: number;
+    damageMult: number;
+}
+
+export const CLASS_STATS: Record<FighterClass, ClassStats> = {
+    STANDARD: {
+        speed: PLAYER_SPEED,
+        maxSpeed: MAX_SPEED,
+        jumpForce: JUMP_FORCE,
+        dashSpeed: DASH_SPEED,
+        dashDuration: DASH_DURATION,
+        dashCooldown: DASH_COOLDOWN,
+        health: 100,
+        damageMult: 1.0
+    },
+    SLINGER: { // Faster, weaker, high mobility
+        speed: PLAYER_SPEED * 1.2,
+        maxSpeed: MAX_SPEED * 1.2,
+        jumpForce: JUMP_FORCE * 1.1,
+        dashSpeed: DASH_SPEED * 1.1,
+        dashDuration: DASH_DURATION * 0.8,
+        dashCooldown: DASH_COOLDOWN * 0.7,
+        health: 80,
+        damageMult: 0.8
+    },
+    VORTEX: { // Floaty, tech-based
+        speed: PLAYER_SPEED * 1.0,
+        maxSpeed: MAX_SPEED * 1.1,
+        jumpForce: JUMP_FORCE * 1.2, // Higher jump
+        dashSpeed: DASH_SPEED * 1.2, // Teleport-like dash
+        dashDuration: DASH_DURATION * 0.6,
+        dashCooldown: DASH_COOLDOWN * 1.2,
+        health: 90,
+        damageMult: 0.9
+    },
+    HEAVY: { // Slow, tanky, huge damage
+        speed: PLAYER_SPEED * 0.8,
+        maxSpeed: MAX_SPEED * 0.8,
+        jumpForce: JUMP_FORCE * 0.8,
+        dashSpeed: DASH_SPEED * 0.9,
+        dashDuration: DASH_DURATION * 1.2,
+        dashCooldown: DASH_COOLDOWN * 1.5,
+        health: 140,
+        damageMult: 1.4
+    }
+};
 
 // Combo System Configuration
 export const ATTACK_RANGE = 120;

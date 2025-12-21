@@ -3,16 +3,18 @@ import React, { useRef } from 'react';
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../constants';
 import { useGameLoop } from '../hooks/useGameLoop';
 import { HUD } from './HUD';
+import { FighterClass } from '../types';
 
 interface GameCanvasProps {
   onGameOver: (winner: 'player' | 'enemy', pScore: number, eScore: number) => void;
   onRestart: () => void;
   gameActive: boolean;
+  playerClass: FighterClass;
 }
 
-export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }) => {
+export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive, playerClass }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const gameStateRef = useGameLoop(canvasRef, gameActive, onGameOver);
+  const gameStateRef = useGameLoop(canvasRef, gameActive, onGameOver, playerClass);
 
   return (
     <div className="relative w-full h-full flex items-center justify-center bg-black">
@@ -22,6 +24,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive }
             <span>[ WASD/ZQSD ] MOVE</span>
             <span>[ SPACE ] DASH</span>
             <span>[ L-CLICK ] ATTACK</span>
+            <span className="text-cyan-500 font-bold ml-4">CLASS: {playerClass}</span>
         </div>
         
         <canvas 

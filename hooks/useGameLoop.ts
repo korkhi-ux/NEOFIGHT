@@ -1,7 +1,7 @@
 
 import { useEffect, useRef } from 'react';
-import { GameState, Fighter } from '../types';
-import { COLORS, WORLD_WIDTH, GROUND_Y, PLAYER_HEIGHT, PLAYER_WIDTH } from '../constants';
+import { GameState, Fighter, FighterClass } from '../types';
+import { COLORS, WORLD_WIDTH, GROUND_Y, PLAYER_HEIGHT, PLAYER_WIDTH, CLASS_STATS } from '../constants';
 import { InputManager } from '../core/InputManager';
 import { AudioManager } from '../core/AudioManager';
 import { updateFighter } from '../logic/fighterPhysics';
@@ -10,67 +10,73 @@ import { checkCollisions } from '../logic/collisionSystem';
 import { updateCamera } from '../rendering/cameraSystem';
 import { renderGame } from '../rendering/gameRenderer';
 
-const createFighter = (id: 'player' | 'enemy', x: number, colorSet: typeof COLORS.player): Fighter => ({
-  id,
-  x,
-  y: GROUND_Y - PLAYER_HEIGHT,
-  vx: 0,
-  vy: 0,
-  width: PLAYER_WIDTH,
-  height: PLAYER_HEIGHT,
-  health: 100,
-  maxHealth: 100,
-  ghostHealth: 100,
-  facing: id === 'player' ? 1 : -1,
+const createFighter = (id: 'player' | 'enemy', x: number, colorSet: typeof COLORS.player, classType: FighterClass = 'STANDARD'): Fighter => {
+  const stats = CLASS_STATS[classType];
   
-  aiState: id === 'enemy' ? {
-      mode: 'neutral', 
-      actionTimer: 0,
-      reactionCooldown: 0,
-      recoveryTimer: 0,
-      difficulty: 0.8, 
-      targetDistance: 80 
-  } : undefined,
+  return {
+    id,
+    classType,
+    x,
+    y: GROUND_Y - PLAYER_HEIGHT,
+    vx: 0,
+    vy: 0,
+    width: PLAYER_WIDTH,
+    height: PLAYER_HEIGHT,
+    health: stats.health,
+    maxHealth: stats.health,
+    ghostHealth: stats.health,
+    facing: id === 'player' ? 1 : -1,
+    
+    // Initializing new mechanics fields
+    specialPowerCharge: 0,
+    isGrappling: false,
+    grapplePoint: null,
+    
+    aiState: id === 'enemy' ? {
+        mode: 'neutral', 
+        actionTimer: 0,
+        reactionCooldown: 0,
+        recoveryTimer: 0,
+        difficulty: 0.8, 
+        targetDistance: 80 
+    } : undefined,
 
-  isGrounded: false,
-  isDashing: false,
-  isAttacking: false,
-  isStunned: false,
-  isDead: false,
-  prevVx: 0,
-  prevGrounded: false,
-  trail: [],
-  comboCount: 0,
-  comboTimer: 0,
-  hitFlashTimer: 0,
-  dashTimer: 0,
-  dashCooldown: 0,
-  attackTimer: 0,
-  attackCooldown: 0,
-  scaleX: 1,
-  scaleY: 1,
-  rotation: 0,
-  color: colorSet,
-  score: 0
-});
+    isGrounded: false,
+    isDashing: false,
+    isAttacking: false,
+    isStunned: false,
+    isDead: false,
+    prevVx: 0,
+    prevGrounded: false,
+    trail: [],
+    comboCount: 0,
+    comboTimer: 0,
+    hitFlashTimer: 0,
+    dashTimer: 0,
+    dashCooldown: 0,
+    attackTimer: 0,
+    attackCooldown: 0,
+    scaleX: 1,
+    scaleY: 1,
+    rotation: 0,
+    color: colorSet,
+    score: 0
+  };
+};
 
 export const useGameLoop = (
     canvasRef: React.RefObject<HTMLCanvasElement>,
     gameActive: boolean,
-    onGameOver: (winner: 'player' | 'enemy', pScore: number, eScore: number) => void
+    onGameOver: (winner: 'player' | 'enemy', pScore: number, eScore: number) => void,
+    playerClass: FighterClass = 'STANDARD'
 ) => {
     const inputManager = useRef(new InputManager());
     const audioManager = useRef<AudioManager | null>(null);
     const prevAttackInput = useRef<{ [key: string]: boolean }>({});
     
-    // Keep scores persistent across rounds in current ref if needed, 
-    // but here we just re-initialize fighters. 
-    // If we want persistent scores we should grab them from previous state.
-    // However, the requested flow is to pass scores OUT.
-    
     const gameState = useRef<GameState>({
-        player: createFighter('player', 200, COLORS.player),
-        enemy: createFighter('enemy', WORLD_WIDTH - 250, COLORS.enemy),
+        player: createFighter('player', 200, COLORS.player, playerClass),
+        enemy: createFighter('enemy', WORLD_WIDTH - 250, COLORS.enemy, 'STANDARD'), // Enemy is Standard for now
         particles: [],
         shockwaves: [],
         impacts: [],
@@ -102,11 +108,11 @@ export const useGameLoop = (
         const currentPScore = gameState.current.player.score;
         const currentEScore = gameState.current.enemy.score;
 
-        // Reset State
+        // Reset State with Selected Class
         gameState.current = {
             ...gameState.current,
-            player: { ...createFighter('player', 200, COLORS.player), score: currentPScore },
-            enemy: { ...createFighter('enemy', WORLD_WIDTH - 250, COLORS.enemy), score: currentEScore },
+            player: { ...createFighter('player', 200, COLORS.player, playerClass), score: currentPScore },
+            enemy: { ...createFighter('enemy', WORLD_WIDTH - 250, COLORS.enemy, 'STANDARD'), score: currentEScore },
             gameActive: true,
             winner: null,
             slowMoFactor: 1.0,
@@ -184,7 +190,7 @@ export const useGameLoop = (
             inputManager.current.unmount();
             audioManager.current?.suspend();
         };
-    }, [gameActive, onGameOver]);
+    }, [gameActive, onGameOver, playerClass]); // dependency on playerClass
 
     return gameState;
 };

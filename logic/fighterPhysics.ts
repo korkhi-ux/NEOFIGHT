@@ -1,8 +1,8 @@
 
 import { 
-  GROUND_Y, GRAVITY, FRICTION, AIR_RESISTANCE, PLAYER_SPEED, 
-  MAX_SPEED, JUMP_FORCE, DASH_SPEED, DASH_DURATION, DASH_COOLDOWN, 
-  ATTACK_DURATIONS, ATTACK_COOLDOWN, COMBO_WINDOW, WORLD_WIDTH 
+  GROUND_Y, GRAVITY, FRICTION, AIR_RESISTANCE,
+  ATTACK_DURATIONS, ATTACK_COOLDOWN, COMBO_WINDOW, WORLD_WIDTH,
+  CLASS_STATS
 } from '../constants';
 import { Fighter, GameState } from '../types';
 import { createParticles } from './effectSpawners';
@@ -25,6 +25,9 @@ export const updateFighter = (
     if (f.isDead) return;
 
     const timeScale = gameState.slowMoFactor;
+    
+    // Retrieve Class Stats
+    const stats = CLASS_STATS[f.classType];
 
     // Save previous state
     const justChangedDir = (Math.sign(f.prevVx) !== Math.sign(f.vx)) && Math.abs(f.vx) > 1;
@@ -78,33 +81,50 @@ export const updateFighter = (
     // --- Action Logic ---
     let isCanceling = false;
 
-    // Dash
+    // Dash Logic (Class Switched)
     if (input.dash && f.dashCooldown <= 0) {
+      // Future logic: Different dash start behaviors could go here
       if (f.isAttacking) {
           isCanceling = true;
           f.isAttacking = false;
       }
       f.isDashing = true;
-      f.dashTimer = DASH_DURATION;
-      f.dashCooldown = DASH_COOLDOWN;
+      f.dashTimer = stats.dashDuration;
+      f.dashCooldown = stats.dashCooldown;
       audio?.playDash();
       
       const dashDir = input.x !== 0 ? Math.sign(input.x) : f.facing;
       f.facing = dashDir as 1 | -1;
       
-      // Extreme Stretch for Dash (Directive 4)
-      f.scaleX = 1.7; // Was 1.6
-      f.scaleY = 0.4; // Was 0.5
+      // Extreme Stretch for Dash
+      f.scaleX = 1.7; 
+      f.scaleY = 0.4; 
       gameState.shake += 2;
     }
 
-    // Jump
+    // Jump Logic (Class Switched)
     if (input.jump && f.isGrounded) {
+       switch(f.classType) {
+           case 'VORTEX':
+               // Placeholder: Vortex might have a floatier jump start?
+               f.vy = stats.jumpForce;
+               break;
+           case 'HEAVY':
+               // Placeholder: Heavy might shake ground on jump?
+               f.vy = stats.jumpForce;
+               break;
+           case 'STANDARD':
+           case 'SLINGER':
+           default:
+               f.vy = stats.jumpForce;
+               break;
+       }
+
        if (f.isAttacking) {
            isCanceling = true;
            f.isAttacking = false;
        }
-       f.vy = JUMP_FORCE;
+       
        f.isGrounded = false;
        // Stretch Up
        f.scaleX = 0.6;
@@ -154,12 +174,23 @@ export const updateFighter = (
     // Physics
     if (f.isDashing) {
       f.dashTimer -= timeScale;
+      
+      // Class Specific Dash Execution
+      switch (f.classType) {
+          case 'VORTEX':
+              // Example: Teleport dash? (Not implemented yet)
+              f.vx = f.facing * stats.dashSpeed;
+              f.vy = 0;
+              break;
+          default:
+              f.vx = f.facing * stats.dashSpeed;
+              f.vy = 0; 
+              break;
+      }
+
       if (f.dashTimer <= 0) {
         f.isDashing = false;
         f.vx *= 0.5;
-      } else {
-        f.vx = f.facing * DASH_SPEED;
-        f.vy = 0; 
       }
     } 
     else if (f.isAttacking) {
@@ -176,10 +207,11 @@ export const updateFighter = (
         }
     }
     else {
-        const accel = f.isGrounded ? PLAYER_SPEED : PLAYER_SPEED * 0.8;
+        // Normal Movement
+        const accel = f.isGrounded ? stats.speed : stats.speed * 0.8;
         f.vx += input.x * accel * timeScale; 
 
-        if (Math.abs(f.vx) > MAX_SPEED) f.vx = Math.sign(f.vx) * MAX_SPEED;
+        if (Math.abs(f.vx) > stats.maxSpeed) f.vx = Math.sign(f.vx) * stats.maxSpeed;
 
         if (input.x === 0) {
            f.vx *= (f.isGrounded ? FRICTION : AIR_RESISTANCE);
@@ -223,17 +255,14 @@ export const updateFighter = (
     }
 
     // Animation Spring (Jiggle Dynamics)
-    // Slower return (0.15 instead of 0.2) to make the wobble visible longer
     f.scaleX += (1 - f.scaleX) * 0.15 * timeScale;
     f.scaleY += (1 - f.scaleY) * 0.15 * timeScale;
 
     // Lean / Rotation Logic
     if (Math.abs(f.vx) < 1.0) {
-        // Fast reset to 0 when stopped
         f.rotation *= 0.7; 
     } else {
-        // Lean proportional to speed
-        const targetRot = (f.vx / MAX_SPEED) * 0.25; 
+        const targetRot = (f.vx / stats.maxSpeed) * 0.25; 
         f.rotation += (targetRot - f.rotation) * 0.2 * timeScale;
     }
     

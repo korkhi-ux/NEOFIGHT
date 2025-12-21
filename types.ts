@@ -1,3 +1,4 @@
+
 export interface Vector {
   x: number;
   y: number;
@@ -71,8 +72,13 @@ export interface AIState {
   nextMove?: { x: number, jump: boolean, dash: boolean, attack: boolean }; // Buffer
 }
 
+// --- CLASS SYSTEM TYPES ---
+export type FighterClass = 'STANDARD' | 'SLINGER' | 'VORTEX' | 'HEAVY';
+
 export interface Fighter {
   id: 'player' | 'enemy';
+  classType: FighterClass; // New: Class definition
+  
   x: number;
   y: number;
   vx: number;
@@ -94,6 +100,11 @@ export interface Fighter {
   isDashing: boolean;
   isAttacking: boolean;
   isDead: boolean;
+
+  // Class Specific Mechanics (Future Proofing)
+  specialPowerCharge: number; // 0 to 100
+  isGrappling?: boolean;
+  grapplePoint?: Vector | null;
 
   // Previous Frame State (for friction/landing particles)
   prevVx: number;
