@@ -97,11 +97,11 @@ export const PLAYER_HEIGHT = 100;
 
 // Visuals
 export const TRAIL_LENGTH = 3; // Shortened trails
-export const MAX_ZOOM = 1.35; 
-export const MIN_ZOOM = 0.75; // Allow zooming out more for the large map
+export const MAX_ZOOM = 1.5; // Close up for impacts
+export const MIN_ZOOM = 0.45; // Wide angle for huge aerial battles
 
 // Camera Dynamics
-export const CAMERA_SMOOTHING = 0.12; 
+export const CAMERA_SMOOTHING = 0.1; // Base smoothing (will be dynamic)
 export const CAMERA_LOOKAHEAD = 150;
 export const CAMERA_TILT_MAX = 0.015;
 
