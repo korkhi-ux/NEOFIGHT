@@ -35,7 +35,7 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
     ctx.save();
     ctx.translate(f.x + f.width / 2, f.y + f.height);
     
-    // Apply Tilt Rotation (Corrected: No longer multiplied by facing, so lean follows velocity direction)
+    // Apply Tilt Rotation
     ctx.rotate(f.rotation); 
     
     ctx.scale(f.scaleX, f.scaleY);
@@ -69,106 +69,87 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
         ctx.fillRect(eyeOffset, -bodyH + 20, 15, 4);
     }
 
-    // --- KINETIC LIGHT BLADES (Attacks) ---
+    // --- ANIME NEEDLE BLADES (Attacks) ---
     if (f.isAttacking) {
-        // Reset transform to center of mass before attack transforms
-        ctx.translate(0, -bodyH/2); 
+        // 1. Alignement de Hauteur Fixe : Centre du buste
+        ctx.translate(0, -bodyH * 0.55);
 
-        // Directive 3: Lighter Composite for "Burning" effect
+        // 5. Rendu Cristallin : Mode 'lighter' et netteté absolue
         ctx.globalCompositeOperation = 'lighter';
-        ctx.shadowBlur = 0; // Directive 3: No blur, sharp edges
+        ctx.shadowBlur = 0; 
 
-        // Colors
-        // We use the glow color but extremely transparent at the tip
+        // Params
         const bladeColor = f.color.glow; 
-        
-        // Random Jitter for "Nervous" energy (Directive 2)
         const jitter = Math.sin(gameState.frameCount * 0.8) * 0.05;
 
-        // Configuration based on Combo Step
+        // 4. Dynamique d'Attaque Longue
         let baseAngle = 0;
-        let offsetX = 0;
-        let offsetY = 0;
-        let bladeLength = 180;
-        let bladeThickness = 18;
+        let bladeLength = 250;
+        let bladeThickness = 12; // Very thin relative to length
 
         if (f.comboCount === 0) {
-            // Step 1: Diagonal High Speed
-            baseAngle = Math.PI / 4;
-            offsetX = 20;
-            bladeLength = 200;
+            // Diagonal Slash
+            baseAngle = Math.PI / 4; 
+            bladeLength = 250;
             bladeThickness = 15;
         } else if (f.comboCount === 1) {
-            // Step 2: Vertical Wide Slash
+            // Wide Angle Slash
             baseAngle = -Math.PI / 6; 
-            offsetX = 40;
-            offsetY = 20;
-            bladeLength = 240;
-            bladeThickness = 25;
+            bladeLength = 280;
+            bladeThickness = 18;
         } else {
-            // Step 3: Horizontal Heavy Thrust
+            // Finisher: Screen Zebra
             baseAngle = 0;
-            offsetX = 50;
-            bladeLength = 350; // Huge reach
-            bladeThickness = 40;
+            bladeLength = 500; 
+            bladeThickness = 25;
         }
 
-        // Apply Player Facing Symmetry via Scale
+        // Apply Symmetry
         ctx.save();
-        ctx.scale(f.facing, 1); // Flips the X axis if facing left
-        
-        // Move to Blade Origin (Relative to flipped axis)
-        ctx.translate(bodyW/2 + offsetX, offsetY);
-        
-        // Rotate (Relative to flipped axis)
+        ctx.scale(f.facing, 1); 
         ctx.rotate(baseAngle + jitter); 
         
-        // --- Draw The Blade Bundle (Directive 2) ---
-
-        // Helper to draw a single kinetic oval
-        const drawKineticOval = (len: number, thick: number, alphaMult: number) => {
+        // 2. & 3. Géométrie "Vrai Ovale Pointu" & Double Pass
+        
+        const drawNeedle = (len: number, thick: number, color: string, alpha: number) => {
             ctx.beginPath();
-            // Ellipse centered at len/2 to extend FROM the origin
-            ctx.ellipse(len/2, 0, len/2, thick/2, 0, 0, Math.PI * 2);
-            
-            // Directive 1: Vivid Gradient (White -> Transparent Color)
-            const grad = ctx.createLinearGradient(0, 0, len, 0);
-            grad.addColorStop(0, 'rgba(255, 255, 255, 1)'); // Pure White Core
-            grad.addColorStop(0.1, 'rgba(255, 255, 255, 0.9)');
-            grad.addColorStop(0.4, bladeColor); // Mid body is color
-            grad.addColorStop(1, 'rgba(0, 0, 0, 0)'); // Fade to nothing
-            
-            ctx.fillStyle = grad;
-            ctx.globalAlpha = alphaMult;
+            ctx.moveTo(0, 0); // Start at chest center
+
+            // Top Curve (Quadratic for sharp needle shape)
+            // Control point is mid-length but pulled out to thickness
+            ctx.quadraticCurveTo(len * 0.5, -thick, len, 0);
+
+            // Bottom Curve
+            ctx.quadraticCurveTo(len * 0.5, thick, 0, 0);
+
+            ctx.fillStyle = color;
+            ctx.globalAlpha = alpha;
             ctx.fill();
-
-            // Directive 3: Ultra-thin center wire
-            ctx.beginPath();
-            ctx.moveTo(0, 0);
-            ctx.lineTo(len * 0.9, 0);
-            ctx.lineWidth = 1;
-            ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-            ctx.stroke();
         };
 
-        // 1. Main Blade
-        drawKineticOval(bladeLength, bladeThickness, 0.9);
+        // Pass 1: Outer Blade (Colored, Wider)
+        // Using a gradient for the outer blade to feel like light fading
+        const grad = ctx.createLinearGradient(0, 0, bladeLength, 0);
+        grad.addColorStop(0, bladeColor);
+        grad.addColorStop(0.5, bladeColor);
+        grad.addColorStop(1, 'rgba(0,0,0,0)'); // Fade tip
+        
+        // Custom draw with gradient logic inline for the outer shell to support gradient
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(bladeLength * 0.5, -bladeThickness, bladeLength, 0);
+        ctx.quadraticCurveTo(bladeLength * 0.5, bladeThickness, 0, 0);
+        ctx.fillStyle = grad;
+        ctx.globalAlpha = 0.8;
+        ctx.fill();
 
-        // 2. Secondary Blade (Upper, Thinner, Angled up)
-        ctx.save();
-        ctx.rotate(-0.08); // -5 degrees approx
-        drawKineticOval(bladeLength * 0.7, bladeThickness * 0.6, 0.6);
-        ctx.restore();
+        // Pass 2: Inner Core (White, Thinner, Sharper)
+        // No gradient, pure hot white
+        drawNeedle(bladeLength * 0.95, bladeThickness * 0.3, '#ffffff', 1.0);
 
-        // 3. Tertiary Blade (Lower, Thinner, Angled down)
-        ctx.save();
-        ctx.rotate(0.08); // +5 degrees approx
-        drawKineticOval(bladeLength * 0.6, bladeThickness * 0.5, 0.6);
-        ctx.restore();
+        ctx.restore(); // Restore facing/rotation
 
-        ctx.restore(); // Restore facing flip
-
-        // Restore standard composite for other elements
+        // Restore standard composite
         ctx.globalCompositeOperation = 'source-over';
     }
     
