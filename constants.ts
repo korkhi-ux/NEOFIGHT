@@ -3,7 +3,7 @@ import { FighterClass } from './types';
 
 export const CANVAS_WIDTH = 1280; // Viewport Width
 export const CANVAS_HEIGHT = 720;
-export const WORLD_WIDTH = 2560; // The actual map size (Double the viewport)
+export const WORLD_WIDTH = 4000; // Expanded Map for Slinger Gameplay
 export const GROUND_Y = 600;
 
 // Base Physics Constants (Used as default for STANDARD class)
@@ -104,6 +104,10 @@ export const MIN_ZOOM = 0.85;
 export const CAMERA_SMOOTHING = 0.12; // Increased for more stability (less floaty)
 export const CAMERA_LOOKAHEAD = 150;
 export const CAMERA_TILT_MAX = 0.015; // Reduced tilt by half for clarity
+
+// Slinger Mechanics
+export const GRAPPLE_COOLDOWN = 60; // Frames
+export const GRAPPLE_MAX_SPEED = 28; // Cap speed to prevent physics explosion
 
 export const COLORS = {
   player: {

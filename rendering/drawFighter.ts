@@ -10,18 +10,29 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
         const endY = f.grapplePoint.y;
 
         ctx.save();
-        ctx.strokeStyle = f.color.glow;
-        ctx.lineWidth = 3;
-        ctx.shadowBlur = 10;
+        
+        // Calculate tension visually
+        const dist = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+        const tensionRatio = Math.min(dist / 400, 1);
+        
+        // Taut Rope: Thinner and darker
+        // Loose Rope: Thicker and brighter
+        const width = 4 - (tensionRatio * 2); 
+        ctx.lineWidth = width;
+        
+        // Color interpolation hack (Bright to Darker Green)
+        ctx.strokeStyle = tensionRatio > 0.8 ? '#4ade80' : f.color.glow;
+        
+        ctx.shadowBlur = 10 * (1 - tensionRatio); // Glow reduces as it stretches
         ctx.shadowColor = f.color.primary;
         
         ctx.beginPath();
         ctx.moveTo(startX, startY);
         
         // Vibrating Rope Effect
-        const dist = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
         const segments = 10;
-        const vibration = Math.sin(gameState.frameCount * 0.8) * 5; // Oscillation magnitude
+        // Vibration reduces as tension increases
+        const vibration = Math.sin(gameState.frameCount * 0.8) * 5 * (1 - tensionRatio); 
         
         for (let i = 1; i < segments; i++) {
             const t = i / segments;

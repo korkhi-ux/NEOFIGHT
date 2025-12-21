@@ -37,6 +37,7 @@ const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClas
     specialPowerCharge: 0,
     isGrappling: false,
     grapplePoint: null,
+    grappleCooldown: 0,
     
     aiState: id === 'enemy' ? {
         mode: 'neutral', 

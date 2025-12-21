@@ -12,15 +12,13 @@ export const updateCamera = (gameState: GameState, viewportWidth: number, viewpo
     const distX = Math.abs(player.x - enemy.x);
     const distY = Math.abs(player.y - enemy.y);
 
-    // 2. Adaptive Zoom (Consider both Horizontal and Vertical distance)
-    // We calculate the zoom required to fit X, and the zoom required to fit Y.
-    // We take the minimum of the two (which results in the widest/furthest view).
+    // 2. Adaptive Zoom (Multi-Axis)
+    // Zoom out if players are far horizontally OR vertically.
+    // Factor 0.55 ensures players stay within the central 55% of the screen.
+    const zoomForX = (viewportWidth * 0.55) / (distX + 300); // Added padding 300
+    const zoomForY = (viewportHeight * 0.55) / (distY + 300); // Added padding 300
     
-    // Factor 0.55 ensures players stay within the central 55% of the screen
-    const zoomForX = (viewportWidth * 0.55) / (distX + 150); 
-    const zoomForY = (viewportHeight * 0.55) / (distY + 150);
-    
-    // Choose the zoom that accommodates the largest dimension needed
+    // Choose the zoom that accommodates the largest dimension needed (The smallest zoom value)
     let desiredZoom = Math.min(zoomForX, zoomForY);
     
     // Clamp Zoom limits
@@ -40,10 +38,6 @@ export const updateCamera = (gameState: GameState, viewportWidth: number, viewpo
     // If player is moving UP fast (negative VY), shift camera UP.
     const lookAheadTargetY = player.vy < -5 ? player.vy * 12 : 0;
     
-    // We smooth this vertically by directly adding it to the target calculation below, 
-    // or we could state-track it if we wanted smoother transitions, 
-    // but direct mapping feels more responsive for fast jumps.
-
     // 4. Dynamic Tilt
     const targetTilt = (Math.abs(player.vx) < 1.0) 
         ? 0 
@@ -58,7 +52,7 @@ export const updateCamera = (gameState: GameState, viewportWidth: number, viewpo
 
     let targetCamX = midX - viewW / 2 + gameState.cameraLookAhead;
     
-    // Vertical Target: Center on MidY, apply LookAhead, and offset slightly so players are lower-third grounded
+    // Vertical Target: Center on MidY, apply LookAhead
     let targetCamY = midY - viewH / 2 + lookAheadTargetY;
 
     // 6. Clamping (World Bounds)
@@ -67,9 +61,7 @@ export const updateCamera = (gameState: GameState, viewportWidth: number, viewpo
     targetCamX = Math.max(0, Math.min(targetCamX, WORLD_WIDTH - viewW));
 
     // Vertical Clamp
-    // Allow going high up (-1500) for grapple gameplay
-    // Prevent going too low (Seeing below ground)
-    // GROUND_Y + 150 allows seeing a bit of "underground" for shake effects, but stops there.
+    // Allow going high up (-1500) for grapple gameplay, stop at ground
     targetCamY = Math.max(-1500, Math.min(targetCamY, GROUND_Y + 150 - viewH));
 
     gameState.cameraX += (targetCamX - gameState.cameraX) * CAMERA_SMOOTHING;

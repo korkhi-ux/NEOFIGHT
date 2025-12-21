@@ -2,7 +2,7 @@
 import { 
   GROUND_Y, GRAVITY, FRICTION, AIR_RESISTANCE,
   ATTACK_DURATIONS, ATTACK_COOLDOWN, COMBO_WINDOW, WORLD_WIDTH,
-  CLASS_STATS
+  CLASS_STATS, GRAPPLE_COOLDOWN, GRAPPLE_MAX_SPEED
 } from '../constants';
 import { Fighter, GameState } from '../types';
 import { createParticles, createGrappleImpact } from './effectSpawners';
@@ -51,6 +51,7 @@ export const updateFighter = (
     if (f.attackCooldown > 0) f.attackCooldown -= timeScale;
     if (f.comboTimer > 0) f.comboTimer -= timeScale;
     if (f.hitFlashTimer > 0) f.hitFlashTimer -= timeScale;
+    if (f.grappleCooldown > 0) f.grappleCooldown -= timeScale;
 
     if (f.comboTimer <= 0 && !f.isAttacking) {
         f.comboCount = 0;
@@ -58,57 +59,69 @@ export const updateFighter = (
 
     // --- SLINGER SPECIAL: GRAPPLE HOOK ---
     if (f.classType === 'SLINGER') {
-        if (input.special && !f.isGrappling) {
+        if (input.special && !f.isGrappling && f.grappleCooldown <= 0) {
             // Initiate Grapple
-            const range = 400;
+            const range = 500; // Increased range
             const angle = -Math.PI / 4; // 45 degrees up
             
             // Calculate theoretical anchor point
             let targetX = f.x + f.width/2 + (f.facing * range * Math.cos(angle));
             let targetY = f.y + (range * Math.sin(angle));
 
-            // Clamp to world bounds (Walls or Ceiling)
+            // Clamp to world bounds
             if (targetX < 0) targetX = 0;
             if (targetX > WORLD_WIDTH) targetX = WORLD_WIDTH;
-            if (targetY < 50) targetY = 50; // Ceiling anchor
+            if (targetY < 50) targetY = 50; 
             
             f.isGrappling = true;
             f.grapplePoint = { x: targetX, y: targetY };
             
             // Elastic Snap Visual
-            f.scaleX = 1.5; // Stretch towards point
+            f.scaleX = 1.5; 
             f.scaleY = 0.6;
             
             createGrappleImpact(gameState, targetX, targetY, f.color.glow);
-            // Optional: audio?.playGrapple();
 
         } else if (input.special && f.isGrappling && f.grapplePoint) {
             // Sustain Grapple (Spring Physics)
             const dx = f.grapplePoint.x - (f.x + f.width/2);
             const dy = f.grapplePoint.y - f.y;
-            // const dist = Math.sqrt(dx*dx + dy*dy);
+            const dist = Math.sqrt(dx*dx + dy*dy);
             
-            // Spring Force (Hooke's Law approx)
-            const tension = 0.08;
-            f.vx += dx * tension * timeScale;
-            f.vy += dy * tension * timeScale;
+            // NERF: Check if player passed the anchor point (Slack rope logic)
+            // If pulling to the right (dx > 0) but player is right of anchor? No.
+            // Vector calculation takes care of direction.
+            // But we want to stop acceleration if we are too close or past it?
             
-            // Air drag while grappling to prevent infinite orbit
-            f.vx *= 0.96;
-            f.vy *= 0.96;
+            // Progressive Tension
+            const tension = Math.min(dist / 400, 1.5); 
             
-            f.isGrounded = false; // Lift off
+            // Horizontal Bias (Propulsion forward)
+            // Increased X multiplier, Reduced Y multiplier
+            f.vx += dx * tension * 0.08 * timeScale; 
+            f.vy += dy * tension * 0.03 * timeScale; 
             
-        } else if (!input.special && f.isGrappling) {
+            // Cap Max Speed
+            const currentSpeed = Math.sqrt(f.vx*f.vx + f.vy*f.vy);
+            if (currentSpeed > GRAPPLE_MAX_SPEED) {
+                const ratio = GRAPPLE_MAX_SPEED / currentSpeed;
+                f.vx *= ratio;
+                f.vy *= ratio;
+            }
+
+            f.isGrounded = false; 
+            
+        } else if ((!input.special && f.isGrappling) || (f.isGrappling && f.grappleCooldown > 0)) {
             // Release
             f.isGrappling = false;
             f.grapplePoint = null;
+            f.grappleCooldown = GRAPPLE_COOLDOWN; // Trigger Cooldown
+            
             // Slingshot boost
             f.vx *= 1.1;
             f.vy *= 1.1;
         }
     } else {
-        // Reset if class changed for some reason
         f.isGrappling = false;
     }
 
@@ -132,19 +145,15 @@ export const updateFighter = (
     }
 
     // --- Action Logic ---
-    let isCanceling = false;
-
+    
     // Dash
     if (input.dash && f.dashCooldown <= 0) {
-      if (f.isAttacking) {
-          isCanceling = true;
-          f.isAttacking = false;
-      }
-      // Break grapple on dash
       if (f.isGrappling) {
           f.isGrappling = false;
           f.grapplePoint = null;
+          f.grappleCooldown = GRAPPLE_COOLDOWN;
       }
+      f.isAttacking = false;
 
       f.isDashing = true;
       f.dashTimer = stats.dashDuration;
@@ -161,20 +170,16 @@ export const updateFighter = (
 
     // Jump
     if (input.jump && (f.isGrounded || (f.classType === 'SLINGER' && f.isGrappling))) {
-       // Slinger can jump out of grapple
        if (f.isGrappling) {
            f.isGrappling = false;
            f.grapplePoint = null;
-           f.vy = stats.jumpForce * 1.2; // Super jump off hook
+           f.grappleCooldown = GRAPPLE_COOLDOWN;
+           f.vy = stats.jumpForce * 1.2; 
        } else {
            f.vy = stats.jumpForce;
        }
-
-       if (f.isAttacking) {
-           isCanceling = true;
-           f.isAttacking = false;
-       }
        
+       f.isAttacking = false;
        f.isGrounded = false;
        f.scaleX = 0.6;
        f.scaleY = 1.5;
@@ -186,10 +191,10 @@ export const updateFighter = (
     const freshAttack = input.attack && !prevAttackInput[f.id];
     
     if (freshAttack && !f.isDashing) {
-        // Break grapple on attack
         if (f.isGrappling) {
              f.isGrappling = false;
              f.grapplePoint = null;
+             f.grappleCooldown = GRAPPLE_COOLDOWN;
         }
 
         let canChain = false;
@@ -282,6 +287,7 @@ export const updateFighter = (
       if (f.isGrappling) {
           f.isGrappling = false;
           f.grapplePoint = null;
+          f.grappleCooldown = GRAPPLE_COOLDOWN;
       }
     } else {
         f.isGrounded = false;

@@ -105,6 +105,7 @@ export interface Fighter {
   specialPowerCharge: number; // 0 to 100
   isGrappling?: boolean;
   grapplePoint?: Vector | null;
+  grappleCooldown: number; // New: Prevents spam
 
   // Previous Frame State (for friction/landing particles)
   prevVx: number;
