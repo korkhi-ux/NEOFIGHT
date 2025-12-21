@@ -65,22 +65,29 @@ export const updateFighter = (
     // --- SLINGER SPECIAL: TACTICAL GRAPPLE ---
     if (f.classType === 'SLINGER') {
         
-        // 1. CANCEL (Toggle off)
+        // 1. CANCEL / RELEASE (Slingshot Effect)
+        // If button pressed again OR button released (optional style, here we use toggle behavior on press)
         if (freshSpecial && f.isGrappling) {
             f.isGrappling = false;
             f.grapplePoint = null;
             f.grappleTargetId = null;
-            f.grappleCooldownTimer = GRAPPLE_COOLDOWN;
-            f.vx *= 0.5; // Brake inertia
+            f.grappleCooldownTimer = GRAPPLE_COOLDOWN; // Trigger Cooldown ON RELEASE
+            
+            // SLINGSHOT BOOST: Preserve and amplify momentum
+            f.vx *= 1.2; 
+            f.vy *= 1.2;
+            
+            // Visual Pop
+            createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.glow);
         }
-        // 2. FIRE (Raycast)
+        // 2. FIRE (Raycast) - Air or Ground
         else if (freshSpecial && !f.isGrappling && f.grappleCooldownTimer <= 0) {
             
             const originX = f.x + f.width / 2;
-            const originY = f.y + f.height / 3; // Shoot from chest/shoulder
+            const originY = f.y + f.height / 3; 
             
-            // Horizontal shot with slight angle (10 degrees)
-            const angleRad = (f.facing === 1 ? 0.17 : Math.PI - 0.17); 
+            // Horizontal shot with slight angle
+            const angleRad = (f.facing === 1 ? 0.1 : Math.PI - 0.1); 
             const dirX = Math.cos(angleRad);
             const dirY = Math.sin(angleRad);
 
@@ -88,13 +95,14 @@ export const updateFighter = (
             let hitTargetId: string | null = null;
             
             // A. Check Enemy Hit (Priority)
-            const dxOpp = opponent.x - f.x;
             const distOpp = Math.sqrt(Math.pow(opponent.x - f.x, 2) + Math.pow(opponent.y - f.y, 2));
-            const inFront = Math.sign(dxOpp) === f.facing;
+            // Can hit enemy anywhere in range, auto-aim slight assist
             const inRange = distOpp < GRAPPLE_RANGE;
-            const verticalAlign = Math.abs((opponent.y + opponent.height/2) - originY) < 150; // Forgiving vertical aim
+            // Check if roughly in front
+            const dxOpp = opponent.x - f.x;
+            const inFront = Math.sign(dxOpp) === f.facing;
 
-            if (inFront && inRange && verticalAlign) {
+            if (inFront && inRange) {
                 hitPoint = { x: opponent.x + opponent.width/2, y: opponent.y + opponent.height/2 };
                 hitTargetId = opponent.id;
             } 
@@ -103,11 +111,10 @@ export const updateFighter = (
                 const targetWallX = f.facing === 1 ? WORLD_WIDTH : 0;
                 const distToWallX = targetWallX - originX;
                 
-                if (Math.abs(distToWallX) < GRAPPLE_RANGE) {
-                     hitPoint = { x: targetWallX, y: originY + (distToWallX * Math.tan(angleRad)) };
-                     // Clamp Y to ground to avoid shooting into abyss
-                     if (hitPoint.y > GROUND_Y) hitPoint.y = GROUND_Y;
-                }
+                // Infinite range basically hits walls always
+                hitPoint = { x: targetWallX, y: originY + (distToWallX * Math.tan(angleRad)) };
+                // Clamp Y
+                if (hitPoint.y > GROUND_Y) hitPoint.y = GROUND_Y;
             }
 
             if (hitPoint) {
@@ -118,14 +125,14 @@ export const updateFighter = (
                 
                 // Visuals
                 createShockwave(gameState, hitPoint.x, hitPoint.y, f.color.glow);
-                createParticles(gameState, hitPoint.x, hitPoint.y, 8, f.color.glow, 5);
+                createParticles(gameState, hitPoint.x, hitPoint.y, 12, f.color.glow, 8);
                 
-                // Initial kick
-                f.vx += dirX * 5;
-                f.vy += dirY * 2;
+                // Initial kick (Recoil/Launch)
+                f.vx += dirX * 2; 
+                f.vy -= 5; // Little hop
             } else {
                 // Whiff
-                f.grappleCooldownTimer = 20; 
+                f.grappleCooldownTimer = 15; 
             }
         } 
         
@@ -143,25 +150,26 @@ export const updateFighter = (
             const dy = f.grapplePoint.y - f.y; 
             const dist = Math.sqrt(dx*dx + dy*dy);
 
-            if (dist < 40) {
-                // Arrived
+            if (dist < 50) {
+                // Arrived (Snap & Release)
                 f.isGrappling = false;
                 f.grapplePoint = null;
                 f.grappleTargetId = null;
-                f.grappleCooldownTimer = GRAPPLE_COOLDOWN;
-            } else {
-                // Elastic Acceleration
-                // The closer you are, the less force? No, standard elastic is F=kx
-                // But for game feel, we want "Zip" effect. 
-                // Constant acceleration works well for "Retract" feel.
+                f.grappleCooldownTimer = GRAPPLE_COOLDOWN; // Trigger Cooldown
                 
-                const pullForce = 0.8 * timeScale; 
+                // Keep momentum but cap slightly to avoid glitching through world
+                f.vx *= 0.8; 
+                f.vy *= 0.8;
+            } else {
+                // EXTREME ELASTIC PULL (Exponential)
+                // The pull force is constant + distance factor, creating "Zip"
+                const pullForce = 2.5 * timeScale; // Violent pull
                 const angle = Math.atan2(dy, dx);
                 
                 f.vx += Math.cos(angle) * pullForce;
                 f.vy += Math.sin(angle) * pullForce;
                 
-                // Cap speed
+                // Cap speed check
                 const speed = Math.sqrt(f.vx*f.vx + f.vy*f.vy);
                 if (speed > GRAPPLE_MAX_SPEED) {
                     const r = GRAPPLE_MAX_SPEED / speed;
@@ -225,8 +233,9 @@ export const updateFighter = (
            f.grapplePoint = null;
            f.grappleTargetId = null;
            f.grappleCooldownTimer = GRAPPLE_COOLDOWN;
+           // Jump boost out of grapple
            f.vy = stats.jumpForce * 1.2; 
-           f.vx *= 1.2; 
+           f.vx *= 1.1; 
        } else {
            f.vy = stats.jumpForce;
        }
@@ -240,7 +249,6 @@ export const updateFighter = (
     }
 
     // Attack
-    
     if (freshAttack && !f.isDashing) {
         if (f.isGrappling) {
              f.isGrappling = false;
@@ -323,10 +331,8 @@ export const updateFighter = (
 
     // Apply Gravity (Scaled by class, and disabled during dash)
     if (!f.isDashing) {
-        // While grappling, gravity is normalized but we still want verticality
-        // Actually, if we want "zip" to target, gravity interferes.
-        // Let's reduce gravity heavily during grapple pull
-        const gMult = f.isGrappling ? 0.2 : stats.gravityScale;
+        // While grappling, almost NO gravity to allow "Straight line" zip
+        const gMult = f.isGrappling ? 0.05 : stats.gravityScale;
         f.vy += GRAVITY * gMult * timeScale;
     }
 
@@ -340,7 +346,7 @@ export const updateFighter = (
           f.vy = 0;
           f.isGrounded = true;
       } else {
-          // If grappling and hit ground, slide
+          // Slide on ground if grappling
       }
     } else {
         f.isGrounded = false;
@@ -358,6 +364,7 @@ export const updateFighter = (
             f.isGrappling = false;
             f.grapplePoint = null;
             f.grappleTargetId = null;
+            f.grappleCooldownTimer = GRAPPLE_COOLDOWN; // Cooldown on crash
         }
     }
     if (f.x + f.width > WORLD_WIDTH) { 
@@ -367,10 +374,11 @@ export const updateFighter = (
         }
         f.x = WORLD_WIDTH - f.width; 
         f.vx = 0; 
-        if (f.isGrappling) { // Release if hit wall
+        if (f.isGrappling) { 
             f.isGrappling = false;
             f.grapplePoint = null;
             f.grappleTargetId = null;
+            f.grappleCooldownTimer = GRAPPLE_COOLDOWN; 
         }
     }
 
@@ -386,7 +394,7 @@ export const updateFighter = (
     if (Math.abs(f.vx) < 1.0) {
         f.rotation *= 0.7; 
     } else {
-        const leanAmount = f.isGrappling ? 1.0 : 0.25; // Extreme lean when grappling
+        const leanAmount = f.isGrappling ? 1.5 : 0.25; // Massive lean when zipping
         const targetRot = (f.vx / stats.maxSpeed) * leanAmount; 
         f.rotation += (targetRot - f.rotation) * 0.2 * timeScale;
     }

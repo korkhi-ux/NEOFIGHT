@@ -106,9 +106,9 @@ export const CAMERA_LOOKAHEAD = 150;
 export const CAMERA_TILT_MAX = 0.015;
 
 // Slinger Mechanics
-export const GRAPPLE_COOLDOWN = 60; // Frames
-export const GRAPPLE_MAX_SPEED = 32; 
-export const GRAPPLE_RANGE = 1200; 
+export const GRAPPLE_COOLDOWN = 45; // Frames (Reduced slightly for better flow)
+export const GRAPPLE_MAX_SPEED = 45; // FLASH SPEED
+export const GRAPPLE_RANGE = WORLD_WIDTH; // Infinite Range
 
 export const COLORS = {
   player: {
@@ -117,9 +117,9 @@ export const COLORS = {
     glow: '#00ffff',
   },
   slinger: {
-    primary: '#a3e635', // Lime Neon
-    secondary: '#10b981', // Emerald
-    glow: '#d9f99d',      // Pale Lime Glow
+    primary: '#22c55e', // Neon Green (Pure)
+    secondary: '#15803d', // Darker Green
+    glow: '#a3e635',      // Electric Lime Glow
   },
   enemy: {
     primary: '#4f46e5', // Electric Indigo

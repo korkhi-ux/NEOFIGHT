@@ -2,58 +2,94 @@
 import { Fighter, GameState } from '../types';
 
 export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState: GameState) => {
-    // --- SLINGER: GRAPPLE ROPE RENDER ---
+    // --- SLINGER: GRAPPLE ROPE RENDER (ORGANIC/JIGGLE) ---
     if (f.classType === 'SLINGER' && f.isGrappling && f.grapplePoint) {
         const startX = f.x + f.width/2;
-        const startY = f.y + f.height/2;
+        const startY = f.y + f.height/3; // Chest level
         const endX = f.grapplePoint.x;
         const endY = f.grapplePoint.y;
         
         const isEnemyHook = f.grappleTargetId !== null;
+        const baseColor = isEnemyHook ? '#ffff00' : f.color.glow;
+        const coreColor = isEnemyHook ? '#ffffff' : '#ccffcc';
 
         ctx.save();
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
         
-        // High Intensity color if hooked to enemy
-        ctx.strokeStyle = isEnemyHook ? '#ffff00' : f.color.glow;
-        ctx.lineWidth = isEnemyHook ? 4 : 3;
-        ctx.shadowBlur = isEnemyHook ? 20 : 10;
-        ctx.shadowColor = isEnemyHook ? '#ffff00' : f.color.primary;
-        
-        ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        
-        // Vibrating Rope Effect
+        const segments = 20; // High segment count for fluid wave
         const dist = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
-        const segments = 10;
-        // More vibration if enemy hooked (tension)
-        const vibration = Math.sin(gameState.frameCount * 0.8) * (isEnemyHook ? 8 : 4); 
         
-        for (let i = 1; i < segments; i++) {
+        // Dynamic Jiggle: Reduces as rope tightens (player gets closer)
+        // But keeps a minimum "electric" vibration
+        const tightness = Math.min(dist / 600, 1);
+        const amplitude = 15 * tightness + 2; 
+        const freq = gameState.frameCount * 0.8;
+
+        // Draw segmented rope to vary thickness
+        for (let i = 0; i < segments; i++) {
             const t = i / segments;
-            const x = startX + (endX - startX) * t;
-            const y = startY + (endY - startY) * t;
+            const tNext = (i + 1) / segments;
+
+            // Interpolate positions
+            const x1 = startX + (endX - startX) * t;
+            const y1 = startY + (endY - startY) * t;
             
-            // Perpendicular offset
-            const perpX = -(endY - startY) / dist;
-            const perpY = (endX - startX) / dist;
+            const x2 = startX + (endX - startX) * tNext;
+            const y2 = startY + (endY - startY) * tNext;
+
+            // Add Sine Wave (Jiggle)
+            // Damping near ends (0 at start/end, 1 in middle)
+            const damp1 = Math.sin(t * Math.PI);
+            const damp2 = Math.sin(tNext * Math.PI);
             
-            // Damping vibration near ends
-            const damp = Math.sin(t * Math.PI); 
+            // Perpendicular vector for wave offset
+            const nx = -(endY - startY) / dist;
+            const ny = (endX - startX) / dist;
+
+            const wave1 = Math.sin(t * 10 + freq) * amplitude * damp1;
+            const wave2 = Math.sin(tNext * 10 + freq) * amplitude * damp2;
+
+            // Add Glitch (Random jitter)
+            const jitterX = (Math.random() - 0.5) * 4 * damp1;
+            const jitterY = (Math.random() - 0.5) * 4 * damp1;
+
+            const finalX1 = x1 + nx * wave1 + jitterX;
+            const finalY1 = y1 + ny * wave1 + jitterY;
+            const finalX2 = x2 + nx * wave2; // Less jitter on next point for continuity, or re-calc
+            const finalY2 = y2 + ny * wave2;
+
+            ctx.beginPath();
+            ctx.moveTo(finalX1, finalY1);
+            ctx.lineTo(finalX2, finalY2);
+
+            // Tapering Thickness: Thick at player (start), thin at anchor (end)
+            const thickness = 6 * (1 - t) + 1; 
+            ctx.lineWidth = thickness;
             
-            ctx.lineTo(
-                x + perpX * vibration * damp, 
-                y + perpY * vibration * damp
-            );
+            ctx.strokeStyle = baseColor;
+            ctx.shadowColor = f.color.primary;
+            ctx.shadowBlur = 15;
+            
+            ctx.stroke();
+            
+            // Core (White center)
+            if (thickness > 2) {
+                ctx.lineWidth = thickness * 0.4;
+                ctx.strokeStyle = coreColor;
+                ctx.shadowBlur = 0;
+                ctx.stroke();
+            }
         }
         
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
-        
-        // Anchor Dot
-        ctx.fillStyle = isEnemyHook ? '#ffff00' : '#fff';
+        // Anchor Burst
+        ctx.fillStyle = coreColor;
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = baseColor;
         ctx.beginPath();
-        ctx.arc(endX, endY, isEnemyHook ? 6 : 4, 0, Math.PI*2);
+        ctx.arc(endX, endY, 6 + Math.random() * 4, 0, Math.PI*2);
         ctx.fill();
+        
         ctx.restore();
     }
 
