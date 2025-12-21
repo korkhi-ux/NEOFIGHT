@@ -5,7 +5,7 @@ import {
   CLASS_STATS
 } from '../constants';
 import { Fighter, GameState } from '../types';
-import { createParticles } from './effectSpawners';
+import { createParticles, createGrappleImpact } from './effectSpawners';
 import { AudioManager } from '../core/AudioManager';
 
 interface FighterInput {
@@ -13,6 +13,7 @@ interface FighterInput {
     jump: boolean;
     dash: boolean;
     attack: boolean;
+    special: boolean;
 }
 
 export const updateFighter = (
@@ -25,8 +26,6 @@ export const updateFighter = (
     if (f.isDead) return;
 
     const timeScale = gameState.slowMoFactor;
-    
-    // Retrieve Class Stats
     const stats = CLASS_STATS[f.classType];
 
     // Save previous state
@@ -41,10 +40,8 @@ export const updateFighter = (
         createParticles(gameState, f.x + f.width/2, f.y + f.height, 5, f.color.glow, 4);
     }
     
-    // Directive 4: Accentuate Jiggle on Landing
     if (justLanded) {
         createParticles(gameState, f.x + f.width/2, f.y + f.height, 8, '#ffffff', 3);
-        // More extreme squash (was 1.4/0.6)
         f.scaleX = 1.5; 
         f.scaleY = 0.5; 
     }
@@ -59,8 +56,64 @@ export const updateFighter = (
         f.comboCount = 0;
     }
 
+    // --- SLINGER SPECIAL: GRAPPLE HOOK ---
+    if (f.classType === 'SLINGER') {
+        if (input.special && !f.isGrappling) {
+            // Initiate Grapple
+            const range = 400;
+            const angle = -Math.PI / 4; // 45 degrees up
+            
+            // Calculate theoretical anchor point
+            let targetX = f.x + f.width/2 + (f.facing * range * Math.cos(angle));
+            let targetY = f.y + (range * Math.sin(angle));
+
+            // Clamp to world bounds (Walls or Ceiling)
+            if (targetX < 0) targetX = 0;
+            if (targetX > WORLD_WIDTH) targetX = WORLD_WIDTH;
+            if (targetY < 50) targetY = 50; // Ceiling anchor
+            
+            f.isGrappling = true;
+            f.grapplePoint = { x: targetX, y: targetY };
+            
+            // Elastic Snap Visual
+            f.scaleX = 1.5; // Stretch towards point
+            f.scaleY = 0.6;
+            
+            createGrappleImpact(gameState, targetX, targetY, f.color.glow);
+            // Optional: audio?.playGrapple();
+
+        } else if (input.special && f.isGrappling && f.grapplePoint) {
+            // Sustain Grapple (Spring Physics)
+            const dx = f.grapplePoint.x - (f.x + f.width/2);
+            const dy = f.grapplePoint.y - f.y;
+            // const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            // Spring Force (Hooke's Law approx)
+            const tension = 0.08;
+            f.vx += dx * tension * timeScale;
+            f.vy += dy * tension * timeScale;
+            
+            // Air drag while grappling to prevent infinite orbit
+            f.vx *= 0.96;
+            f.vy *= 0.96;
+            
+            f.isGrounded = false; // Lift off
+            
+        } else if (!input.special && f.isGrappling) {
+            // Release
+            f.isGrappling = false;
+            f.grapplePoint = null;
+            // Slingshot boost
+            f.vx *= 1.1;
+            f.vy *= 1.1;
+        }
+    } else {
+        // Reset if class changed for some reason
+        f.isGrappling = false;
+    }
+
     // --- Trails ---
-    const isHighSpeed = Math.abs(f.vx) > 5 || f.isDashing || f.isAttacking;
+    const isHighSpeed = Math.abs(f.vx) > 5 || f.isDashing || f.isAttacking || f.isGrappling;
     if (isHighSpeed && gameState.frameCount % (Math.ceil(2/timeScale)) === 0) {
         f.trail.push({
             x: f.x,
@@ -81,13 +134,18 @@ export const updateFighter = (
     // --- Action Logic ---
     let isCanceling = false;
 
-    // Dash Logic (Class Switched)
+    // Dash
     if (input.dash && f.dashCooldown <= 0) {
-      // Future logic: Different dash start behaviors could go here
       if (f.isAttacking) {
           isCanceling = true;
           f.isAttacking = false;
       }
+      // Break grapple on dash
+      if (f.isGrappling) {
+          f.isGrappling = false;
+          f.grapplePoint = null;
+      }
+
       f.isDashing = true;
       f.dashTimer = stats.dashDuration;
       f.dashCooldown = stats.dashCooldown;
@@ -96,28 +154,20 @@ export const updateFighter = (
       const dashDir = input.x !== 0 ? Math.sign(input.x) : f.facing;
       f.facing = dashDir as 1 | -1;
       
-      // Extreme Stretch for Dash
       f.scaleX = 1.7; 
       f.scaleY = 0.4; 
       gameState.shake += 2;
     }
 
-    // Jump Logic (Class Switched)
-    if (input.jump && f.isGrounded) {
-       switch(f.classType) {
-           case 'VORTEX':
-               // Placeholder: Vortex might have a floatier jump start?
-               f.vy = stats.jumpForce;
-               break;
-           case 'HEAVY':
-               // Placeholder: Heavy might shake ground on jump?
-               f.vy = stats.jumpForce;
-               break;
-           case 'STANDARD':
-           case 'SLINGER':
-           default:
-               f.vy = stats.jumpForce;
-               break;
+    // Jump
+    if (input.jump && (f.isGrounded || (f.classType === 'SLINGER' && f.isGrappling))) {
+       // Slinger can jump out of grapple
+       if (f.isGrappling) {
+           f.isGrappling = false;
+           f.grapplePoint = null;
+           f.vy = stats.jumpForce * 1.2; // Super jump off hook
+       } else {
+           f.vy = stats.jumpForce;
        }
 
        if (f.isAttacking) {
@@ -126,7 +176,6 @@ export const updateFighter = (
        }
        
        f.isGrounded = false;
-       // Stretch Up
        f.scaleX = 0.6;
        f.scaleY = 1.5;
        createParticles(gameState, f.x + f.width/2, f.y + f.height, 5, '#fff', 3);
@@ -137,6 +186,12 @@ export const updateFighter = (
     const freshAttack = input.attack && !prevAttackInput[f.id];
     
     if (freshAttack && !f.isDashing) {
+        // Break grapple on attack
+        if (f.isGrappling) {
+             f.isGrappling = false;
+             f.grapplePoint = null;
+        }
+
         let canChain = false;
         
         if (!f.isAttacking && f.attackCooldown <= 0) {
@@ -171,22 +226,11 @@ export const updateFighter = (
         }
     }
     
-    // Physics
+    // Physics Update
     if (f.isDashing) {
       f.dashTimer -= timeScale;
-      
-      // Class Specific Dash Execution
-      switch (f.classType) {
-          case 'VORTEX':
-              // Example: Teleport dash? (Not implemented yet)
-              f.vx = f.facing * stats.dashSpeed;
-              f.vy = 0;
-              break;
-          default:
-              f.vx = f.facing * stats.dashSpeed;
-              f.vy = 0; 
-              break;
-      }
+      f.vx = f.facing * stats.dashSpeed;
+      f.vy = 0; 
 
       if (f.dashTimer <= 0) {
         f.isDashing = false;
@@ -207,18 +251,25 @@ export const updateFighter = (
         }
     }
     else {
-        // Normal Movement
-        const accel = f.isGrounded ? stats.speed : stats.speed * 0.8;
-        f.vx += input.x * accel * timeScale; 
+        // Normal Movement (Modified if grappling)
+        if (!f.isGrappling) {
+            const accel = f.isGrounded ? stats.speed : stats.speed * 0.8;
+            f.vx += input.x * accel * timeScale; 
 
-        if (Math.abs(f.vx) > stats.maxSpeed) f.vx = Math.sign(f.vx) * stats.maxSpeed;
+            if (Math.abs(f.vx) > stats.maxSpeed) f.vx = Math.sign(f.vx) * stats.maxSpeed;
 
-        if (input.x === 0) {
-           f.vx *= (f.isGrounded ? FRICTION : AIR_RESISTANCE);
+            if (input.x === 0) {
+            f.vx *= (f.isGrounded ? FRICTION : AIR_RESISTANCE);
+            }
         }
     }
 
-    if (!f.isDashing) f.vy += GRAVITY * timeScale;
+    // Apply Gravity (Scaled by class, and disabled during dash)
+    if (!f.isDashing) {
+        // While grappling, gravity is reduced to allow swinging
+        const gMult = f.isGrappling ? 0.3 : stats.gravityScale;
+        f.vy += GRAVITY * gMult * timeScale;
+    }
 
     f.x += f.vx * timeScale;
     f.y += f.vy * timeScale;
@@ -228,15 +279,19 @@ export const updateFighter = (
       f.y = GROUND_Y - f.height;
       f.vy = 0;
       f.isGrounded = true;
+      if (f.isGrappling) {
+          f.isGrappling = false;
+          f.grapplePoint = null;
+      }
     } else {
         f.isGrounded = false;
     }
 
-    // --- Wall Physics with Particle Effect ---
+    // --- Wall Physics ---
     if (f.x < 0) { 
         if (f.vx < -5) {
             createParticles(gameState, 0, f.y + f.height/2, 5, '#ffffff', 5);
-            f.scaleX = 0.8; // Squash against wall
+            f.scaleX = 0.8; 
         }
         f.x = 0; 
         f.vx = 0; 
@@ -244,34 +299,33 @@ export const updateFighter = (
     if (f.x + f.width > WORLD_WIDTH) { 
         if (f.vx > 5) {
             createParticles(gameState, WORLD_WIDTH, f.y + f.height/2, 5, '#ffffff', 5);
-            f.scaleX = 0.8; // Squash against wall
+            f.scaleX = 0.8; 
         }
         f.x = WORLD_WIDTH - f.width; 
         f.vx = 0; 
     }
 
-    if (input.x !== 0 && !f.isDashing && !f.isAttacking) {
+    if (input.x !== 0 && !f.isDashing && !f.isAttacking && !f.isGrappling) {
       f.facing = Math.sign(input.x) as 1 | -1;
     }
 
-    // Animation Spring (Jiggle Dynamics)
+    // Animation Spring
     f.scaleX += (1 - f.scaleX) * 0.15 * timeScale;
     f.scaleY += (1 - f.scaleY) * 0.15 * timeScale;
 
-    // Lean / Rotation Logic
+    // Lean
     if (Math.abs(f.vx) < 1.0) {
         f.rotation *= 0.7; 
     } else {
-        const targetRot = (f.vx / stats.maxSpeed) * 0.25; 
+        const leanAmount = f.isGrappling ? 0.5 : 0.25; // Lean more when grappling
+        const targetRot = (f.vx / stats.maxSpeed) * leanAmount; 
         f.rotation += (targetRot - f.rotation) * 0.2 * timeScale;
     }
     
-    // Run Bounce
     if (Math.abs(f.vx) > 1 && f.isGrounded) {
         f.scaleY = 1 + Math.sin(gameState.frameCount * 0.5) * 0.05;
         f.scaleX = 1 - Math.sin(gameState.frameCount * 0.5) * 0.05;
     }
 
-    // Update Input Ref check
     prevAttackInput[f.id] = input.attack;
 };

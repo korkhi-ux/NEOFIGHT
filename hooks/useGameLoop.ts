@@ -10,8 +10,14 @@ import { checkCollisions } from '../logic/collisionSystem';
 import { updateCamera } from '../rendering/cameraSystem';
 import { renderGame } from '../rendering/gameRenderer';
 
-const createFighter = (id: 'player' | 'enemy', x: number, colorSet: typeof COLORS.player, classType: FighterClass = 'STANDARD'): Fighter => {
+const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClass = 'STANDARD'): Fighter => {
   const stats = CLASS_STATS[classType];
+  
+  // Determine color based on class and ID
+  let colorSet = id === 'enemy' ? COLORS.enemy : COLORS.player;
+  if (id === 'player' && classType === 'SLINGER') {
+      colorSet = COLORS.slinger;
+  }
   
   return {
     id,
@@ -75,8 +81,8 @@ export const useGameLoop = (
     const prevAttackInput = useRef<{ [key: string]: boolean }>({});
     
     const gameState = useRef<GameState>({
-        player: createFighter('player', 200, COLORS.player, playerClass),
-        enemy: createFighter('enemy', WORLD_WIDTH - 250, COLORS.enemy, 'STANDARD'), // Enemy is Standard for now
+        player: createFighter('player', 200, playerClass),
+        enemy: createFighter('enemy', WORLD_WIDTH - 250, 'STANDARD'), 
         particles: [],
         shockwaves: [],
         impacts: [],
@@ -111,8 +117,8 @@ export const useGameLoop = (
         // Reset State with Selected Class
         gameState.current = {
             ...gameState.current,
-            player: { ...createFighter('player', 200, COLORS.player, playerClass), score: currentPScore },
-            enemy: { ...createFighter('enemy', WORLD_WIDTH - 250, COLORS.enemy, 'STANDARD'), score: currentEScore },
+            player: { ...createFighter('player', 200, playerClass), score: currentPScore },
+            enemy: { ...createFighter('enemy', WORLD_WIDTH - 250, 'STANDARD'), score: currentEScore },
             gameActive: true,
             winner: null,
             slowMoFactor: 1.0,

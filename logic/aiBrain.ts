@@ -2,8 +2,8 @@
 import { ATTACK_RANGE, ATTACK_DURATIONS } from '../constants';
 import { Fighter, GameState } from '../types';
 
-export const updateAI = (enemy: Fighter, player: Fighter, gameState: GameState): { x: number, jump: boolean, dash: boolean, attack: boolean } => {
-    if (enemy.isDead || !enemy.aiState) return { x: 0, jump: false, dash: false, attack: false };
+export const updateAI = (enemy: Fighter, player: Fighter, gameState: GameState): { x: number, jump: boolean, dash: boolean, attack: boolean, special: boolean } => {
+    if (enemy.isDead || !enemy.aiState) return { x: 0, jump: false, dash: false, attack: false, special: false };
 
     const ai = enemy.aiState;
     const dx = player.x - enemy.x;
@@ -18,7 +18,8 @@ export const updateAI = (enemy: Fighter, player: Fighter, gameState: GameState):
             x: -Math.sign(dx), 
             jump: ai.recoveryTimer % 15 === 0, 
             dash: false, 
-            attack: false 
+            attack: false,
+            special: false
         };
     }
 
@@ -30,7 +31,7 @@ export const updateAI = (enemy: Fighter, player: Fighter, gameState: GameState):
     if (ai.reactionCooldown > 0) {
         ai.reactionCooldown -= timeScale;
         if (ai.nextMove) return ai.nextMove;
-        return { x: 0, jump: false, dash: false, attack: false };
+        return { x: 0, jump: false, dash: false, attack: false, special: false };
     }
 
     // Context Analysis
@@ -48,6 +49,7 @@ export const updateAI = (enemy: Fighter, player: Fighter, gameState: GameState):
     let jump = false;
     let dash = false;
     let attack = false;
+    let special = false;
 
     // Action Timer
     if (ai.actionTimer > 0) {
@@ -58,7 +60,7 @@ export const updateAI = (enemy: Fighter, player: Fighter, gameState: GameState):
     // Combo Chaining Logic
     if (enemy.isAttacking) {
          if (enemy.attackTimer < ATTACK_DURATIONS[enemy.comboCount] * 0.5) {
-             if (enemy.comboCount === 1 && Math.random() < 0.1) return { x: 0, jump: false, dash: false, attack: false };
+             if (enemy.comboCount === 1 && Math.random() < 0.1) return { x: 0, jump: false, dash: false, attack: false, special: false };
              attack = true; 
          }
          
@@ -67,7 +69,7 @@ export const updateAI = (enemy: Fighter, player: Fighter, gameState: GameState):
              inputX = Math.sign(dx);
          }
          
-         const move = { x: inputX, jump, dash, attack };
+         const move = { x: inputX, jump, dash, attack, special: false };
          ai.nextMove = move;
          return move;
     }
@@ -115,7 +117,7 @@ export const updateAI = (enemy: Fighter, player: Fighter, gameState: GameState):
     }
 
     ai.actionTimer = 5; 
-    const result = { x: inputX, jump, dash, attack };
+    const result = { x: inputX, jump, dash, attack, special };
     ai.nextMove = result;
     return result;
 };

@@ -7,6 +7,7 @@ export class InputManager {
     this.handleKeyUp = this.handleKeyUp.bind(this);
     this.handleMouseDown = this.handleMouseDown.bind(this);
     this.handleMouseUp = this.handleMouseUp.bind(this);
+    this.handleContextMenu = this.handleContextMenu.bind(this);
   }
 
   mount() {
@@ -14,6 +15,7 @@ export class InputManager {
     window.addEventListener('keyup', this.handleKeyUp);
     window.addEventListener('mousedown', this.handleMouseDown);
     window.addEventListener('mouseup', this.handleMouseUp);
+    window.addEventListener('contextmenu', this.handleContextMenu);
   }
 
   unmount() {
@@ -21,6 +23,7 @@ export class InputManager {
     window.removeEventListener('keyup', this.handleKeyUp);
     window.removeEventListener('mousedown', this.handleMouseDown);
     window.removeEventListener('mouseup', this.handleMouseUp);
+    window.removeEventListener('contextmenu', this.handleContextMenu);
   }
 
   handleKeyDown(e: KeyboardEvent) {
@@ -33,18 +36,25 @@ export class InputManager {
 
   handleMouseDown(e: MouseEvent) {
     if (e.button === 0) this.keys['MouseLeft'] = true;
+    if (e.button === 2) this.keys['MouseRight'] = true;
   }
 
   handleMouseUp(e: MouseEvent) {
     if (e.button === 0) this.keys['MouseLeft'] = false;
+    if (e.button === 2) this.keys['MouseRight'] = false;
+  }
+
+  handleContextMenu(e: MouseEvent) {
+    e.preventDefault(); // Block the menu
   }
 
   getPlayerInput() {
     return {
       x: (this.keys['KeyD'] ? 1 : 0) - (this.keys['KeyA'] ? 1 : 0),
       jump: this.keys['KeyW'] || this.keys['KeyZ'] || this.keys['Space'],
-      dash: this.keys['Space'],
-      attack: this.keys['MouseLeft']
+      dash: this.keys['ShiftLeft'], // Shift is usually better for dash if E/RightClick is special
+      attack: this.keys['MouseLeft'],
+      special: this.keys['MouseRight'] || this.keys['KeyE']
     };
   }
 }

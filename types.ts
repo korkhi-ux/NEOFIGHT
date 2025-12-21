@@ -69,7 +69,7 @@ export interface AIState {
   recoveryTimer: number; // Forced pause after combos
   difficulty: number; // 0.0 to 1.0 (1.0 is expert)
   targetDistance: number; // Desired spacing
-  nextMove?: { x: number, jump: boolean, dash: boolean, attack: boolean }; // Buffer
+  nextMove?: { x: number, jump: boolean, dash: boolean, attack: boolean, special: boolean }; // Buffer
 }
 
 // --- CLASS SYSTEM TYPES ---

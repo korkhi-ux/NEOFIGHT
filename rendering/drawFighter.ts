@@ -2,7 +2,57 @@
 import { Fighter, GameState } from '../types';
 
 export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState: GameState) => {
-    // Death Squash
+    // --- SLINGER: GRAPPLE ROPE RENDER ---
+    if (f.classType === 'SLINGER' && f.isGrappling && f.grapplePoint) {
+        const startX = f.x + f.width/2;
+        const startY = f.y + f.height/2;
+        const endX = f.grapplePoint.x;
+        const endY = f.grapplePoint.y;
+
+        ctx.save();
+        ctx.strokeStyle = f.color.glow;
+        ctx.lineWidth = 3;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = f.color.primary;
+        
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        
+        // Vibrating Rope Effect
+        const dist = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+        const segments = 10;
+        const vibration = Math.sin(gameState.frameCount * 0.8) * 5; // Oscillation magnitude
+        
+        for (let i = 1; i < segments; i++) {
+            const t = i / segments;
+            const x = startX + (endX - startX) * t;
+            const y = startY + (endY - startY) * t;
+            
+            // Perpendicular offset
+            const perpX = -(endY - startY) / dist;
+            const perpY = (endX - startX) / dist;
+            
+            // Damping vibration near ends
+            const damp = Math.sin(t * Math.PI); 
+            
+            ctx.lineTo(
+                x + perpX * vibration * damp, 
+                y + perpY * vibration * damp
+            );
+        }
+        
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+        
+        // Anchor Dot
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(endX, endY, 4, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // --- Death Squash ---
     if (f.health <= 0 && f.id === 'enemy' && f.scaleY > 0) {
             f.scaleY *= 0.9;
             f.scaleX *= 1.1;
@@ -40,12 +90,19 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
     
     ctx.scale(f.scaleX, f.scaleY);
     
+    // SLINGER SPEED AURA
+    if (f.classType === 'SLINGER' && (Math.abs(f.vx) > 10 || f.isGrappling)) {
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = f.color.primary;
+    } else {
+        // Flicker intensity based on frame
+        const flicker = Math.abs(Math.sin(gameState.frameCount * 0.2)) * 10 + 20;
+        ctx.shadowBlur = flicker;
+        ctx.shadowColor = f.color.glow;
+    }
+
     // Body Fill
     ctx.fillStyle = f.color.primary;
-    // Flicker intensity based on frame
-    const flicker = Math.abs(Math.sin(gameState.frameCount * 0.2)) * 10 + 20;
-    ctx.shadowBlur = flicker;
-    ctx.shadowColor = f.color.glow;
 
     const bodyW = f.width;
     const bodyH = f.height;

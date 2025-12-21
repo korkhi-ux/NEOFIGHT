@@ -27,6 +27,21 @@ export const createImpact = (gameState: GameState, x: number, y: number, color: 
   });
 };
 
+export const createGrappleImpact = (gameState: GameState, x: number, y: number, color: string) => {
+    // Ring effect
+    gameState.shockwaves.push({
+        id: Math.random().toString(),
+        x, y,
+        radius: 5,
+        maxRadius: 60,
+        color: color,
+        width: 3,
+        alpha: 1
+    });
+    // Sparks
+    createParticles(gameState, x, y, 8, color, 8);
+};
+
 export const createFlare = (gameState: GameState, x: number, y: number, color: string) => {
   gameState.flares.push({
       id: Math.random().toString(),

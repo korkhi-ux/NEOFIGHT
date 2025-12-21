@@ -28,6 +28,7 @@ interface ClassStats {
     dashCooldown: number;
     health: number;
     damageMult: number;
+    gravityScale: number; // New prop for floatiness
 }
 
 export const CLASS_STATS: Record<FighterClass, ClassStats> = {
@@ -39,17 +40,19 @@ export const CLASS_STATS: Record<FighterClass, ClassStats> = {
         dashDuration: DASH_DURATION,
         dashCooldown: DASH_COOLDOWN,
         health: 100,
-        damageMult: 1.0
+        damageMult: 1.0,
+        gravityScale: 1.0
     },
     SLINGER: { // Faster, weaker, high mobility
         speed: PLAYER_SPEED * 1.2,
-        maxSpeed: MAX_SPEED * 1.2,
-        jumpForce: JUMP_FORCE * 1.1,
+        maxSpeed: MAX_SPEED * 1.3,
+        jumpForce: JUMP_FORCE * 1.0,
         dashSpeed: DASH_SPEED * 1.1,
         dashDuration: DASH_DURATION * 0.8,
         dashCooldown: DASH_COOLDOWN * 0.7,
         health: 80,
-        damageMult: 0.8
+        damageMult: 0.8,
+        gravityScale: 0.85 // Floaty
     },
     VORTEX: { // Floaty, tech-based
         speed: PLAYER_SPEED * 1.0,
@@ -59,7 +62,8 @@ export const CLASS_STATS: Record<FighterClass, ClassStats> = {
         dashDuration: DASH_DURATION * 0.6,
         dashCooldown: DASH_COOLDOWN * 1.2,
         health: 90,
-        damageMult: 0.9
+        damageMult: 0.9,
+        gravityScale: 0.7
     },
     HEAVY: { // Slow, tanky, huge damage
         speed: PLAYER_SPEED * 0.8,
@@ -69,7 +73,8 @@ export const CLASS_STATS: Record<FighterClass, ClassStats> = {
         dashDuration: DASH_DURATION * 1.2,
         dashCooldown: DASH_COOLDOWN * 1.5,
         health: 140,
-        damageMult: 1.4
+        damageMult: 1.4,
+        gravityScale: 1.2
     }
 };
 
@@ -105,6 +110,11 @@ export const COLORS = {
     primary: '#00f0ff', // Electric Cyan
     secondary: '#0080ff',
     glow: '#00ffff',
+  },
+  slinger: {
+    primary: '#a3e635', // Lime Neon
+    secondary: '#10b981', // Emerald
+    glow: '#d9f99d',      // Pale Lime Glow
   },
   enemy: {
     primary: '#4f46e5', // Electric Indigo
