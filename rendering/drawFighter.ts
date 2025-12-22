@@ -2,6 +2,47 @@
 import { Fighter, GameState } from '../types';
 
 export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState: GameState) => {
+    const bodyW = f.width;
+    const bodyH = f.height;
+    
+    // --- KINETIC VFX: THERMAL MIST AURA (Render Behind) ---
+    if (f.classType === 'KINETIC' && f.heat !== undefined && f.heat > 0) {
+        const heatRatio = f.heat / 100;
+        
+        ctx.save();
+        ctx.translate(f.x + bodyW/2, f.y + bodyH/2);
+        
+        // Mist Color Interpolation
+        let mistColor = '255, 255, 255'; // White default
+        if (f.heat > 30 && f.heat <= 70) mistColor = '255, 165, 0'; // Orange
+        if (f.heat > 70) mistColor = '255, 0, 0'; // Red
+        
+        const count = 3 + Math.floor(heatRatio * 5); // More circles with heat
+        
+        for(let i=0; i<count; i++) {
+             // Noise movement
+             const t = gameState.frameCount * 0.05 + i;
+             const ox = Math.sin(t) * 10 * (1 + heatRatio);
+             const oy = Math.cos(t * 1.3) * 10 * (1 + heatRatio);
+             
+             // Radius grows with heat
+             const r = 30 + (heatRatio * 50) + Math.sin(t * 2) * 5;
+             
+             ctx.beginPath();
+             ctx.arc(ox, oy - 20, r, 0, Math.PI * 2);
+             
+             // Core darker if overheated
+             if (f.heat > 80 && i % 2 === 0) {
+                 ctx.fillStyle = `rgba(20, 0, 0, 0.3)`;
+             } else {
+                 ctx.fillStyle = `rgba(${mistColor}, 0.15)`;
+             }
+             
+             ctx.fill();
+        }
+        
+        ctx.restore();
+    }
     
     // --- VORTEX: VOID ORB RENDER ---
     if (f.classType === 'VORTEX' && f.voidOrb && f.voidOrb.active) {
@@ -172,9 +213,6 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
         ctx.shadowColor = f.color.glow;
     }
 
-    const bodyW = f.width;
-    const bodyH = f.height;
-
     // Body Render
     if (f.classType === 'VORTEX') {
         // --- GLITCH BODY (VORTEX) ---
@@ -195,40 +233,22 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
 
     } else if (f.classType === 'KINETIC') {
         // --- BULKY BODY (KINETIC) ---
-        const bulkW = bodyW * 1.3;
-        const bulkH = bodyH * 0.9;
+        // Same width as standard, just visual bulk via shape
+        const bulkW = bodyW;
         
         ctx.fillStyle = f.color.primary;
         ctx.beginPath();
-        // Trapezoid shape for bulkiness
-        ctx.moveTo(-bulkW/2 + 5, -bulkH);
-        ctx.lineTo(bulkW/2 - 5, -bulkH);
-        ctx.lineTo(bulkW/2, 0);
-        ctx.lineTo(-bulkW/2, 0);
+        // Slightly trapezoid for heaviness
+        ctx.moveTo(-bulkW/2 + 2, -bodyH);
+        ctx.lineTo(bulkW/2 - 2, -bodyH);
+        ctx.lineTo(bulkW/2 + 4, 0); // Wider base
+        ctx.lineTo(-bulkW/2 - 4, 0);
         ctx.closePath();
         ctx.fill();
         
         ctx.lineWidth = 3;
         ctx.strokeStyle = f.color.secondary;
         ctx.stroke();
-
-        // THERMAL CORE
-        if (f.heat !== undefined) {
-             const heatRatio = f.heat / 100;
-             let coreColor = '#fbbf24'; // Yellow (low)
-             if (heatRatio > 0.5) coreColor = '#ef4444'; // Red (med)
-             if (heatRatio > 0.8) coreColor = '#ffffff'; // White hot (high)
-
-             ctx.fillStyle = coreColor;
-             ctx.shadowColor = coreColor;
-             ctx.shadowBlur = 10 + (20 * heatRatio);
-             
-             const pulse = Math.sin(gameState.frameCount * 0.5) * (5 * heatRatio);
-             
-             ctx.beginPath();
-             ctx.arc(0, -bulkH * 0.6, 12 + pulse, 0, Math.PI * 2);
-             ctx.fill();
-        }
 
     } else {
         // --- STANDARD BODY ---

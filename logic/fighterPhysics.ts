@@ -42,29 +42,26 @@ export const updateFighter = (
 
     // --- KINETIC: THERMAL CORE PASSIVE ---
     if (f.classType === 'KINETIC' && f.heat !== undefined) {
-        // 1. Gain Heat from Movement
+        // 1. Gain Heat from Movement (Ground Friction)
         if (f.isGrounded && Math.abs(f.vx) > 1) {
-            f.heat += Math.abs(f.vx) * 0.1 * timeScale;
+            f.heat += Math.abs(f.vx) * 0.08 * timeScale;
+        } 
+        // Decay Heat if idle
+        else if (Math.abs(f.vx) < 1 && f.heat > 0) {
+            f.heat -= 0.1 * timeScale;
         }
+
         // 2. Gain Heat from Braking (Friction)
         if (f.isGrounded && justChangedDir) {
             f.heat += 5;
             createParticles(gameState, f.x + f.width/2, f.y + f.height, 3, f.color.secondary, 2);
         }
 
-        f.heat = Math.min(100, f.heat);
+        f.heat = Math.max(0, Math.min(100, f.heat));
 
-        // 3. Overheat Logic
-        if (f.heat > 80) {
-             // Self Burn: 1 Damage per second (approx every 60 frames)
-             if (gameState.frameCount % 60 === 0) {
-                 f.health -= 1;
-                 createParticles(gameState, f.x + f.width/2, f.y + f.height/2, 3, '#ff0000', 5);
-             }
-             // Smoke/Steam visual
-             if (Math.random() < 0.2) {
-                 createParticles(gameState, f.x + Math.random()*f.width, f.y + Math.random()*f.height, 1, '#ffffff', 2);
-             }
+        // Overheat Visual (Smoke) - No Self Damage in this version
+        if (f.heat > 50 && Math.random() < (f.heat / 200)) {
+             createParticles(gameState, f.x + Math.random()*f.width, f.y + Math.random()*f.height, 1, '#ffffff', 2);
         }
     }
 
@@ -77,9 +74,8 @@ export const updateFighter = (
         // KINETIC: Heavy Landing
         if (f.classType === 'KINETIC') {
             createParticles(gameState, f.x + f.width/2, f.y + f.height, 15, f.color.glow, 5);
-            createShockwave(gameState, f.x + f.width/2, f.y + f.height, f.color.secondary);
-            f.scaleX = 1.6; // Massive Squash
-            f.scaleY = 0.4;
+            f.scaleX = 1.3; 
+            f.scaleY = 0.5; // Pronounced heavy squash
             gameState.shake += 5; // Ground Shake
             audio?.playHit(true); // Thud sound
         } else {
@@ -102,43 +98,45 @@ export const updateFighter = (
 
     // --- KINETIC SPECIAL: SEISMIC DISCHARGE ---
     if (f.classType === 'KINETIC' && freshSpecial && f.heat !== undefined) {
-        // Calculate power based on heat
-        const chargeLevel = f.heat / 100;
-        const radius = 100 + (chargeLevel * 300); // 100 to 400px
-        const damage = 10 + (chargeLevel * 30); // 10 to 40 dmg
-        const knockback = 10 + (chargeLevel * 30);
+        // Must have some heat to explode
+        const chargeLevel = Math.max(0.2, f.heat / 100); 
+        
+        // Explosion Properties
+        const radius = 150 + (chargeLevel * 250); // 150 to 400px
+        const damage = 15 + (chargeLevel * 30); // 15 to 45 dmg
+        const knockback = 20 + (chargeLevel * 30);
         
         // VISUALS
         createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.glow);
         createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.primary);
-        createParticles(gameState, f.x + f.width/2, f.y + f.height/2, 20, f.color.glow, 15 * chargeLevel);
-        gameState.shake += 10 + (20 * chargeLevel);
+        createParticles(gameState, f.x + f.width/2, f.y + f.height/2, 30, f.color.secondary, 20 * chargeLevel);
+        gameState.shake += 15 + (15 * chargeLevel);
         createFlare(gameState, f.x + f.width/2, f.y + f.height/2, f.color.primary);
 
         // AOE HIT DETECTION
         const distOpp = Math.sqrt(Math.pow((opponent.x + opponent.width/2) - (f.x + f.width/2), 2) + Math.pow((opponent.y + opponent.height/2) - (f.y + f.height/2), 2));
         
         if (distOpp < radius) {
-            if (!opponent.isDashing) { // Can dodge with dash
-                opponent.health -= damage;
-                opponent.hitFlashTimer = 5;
-                opponent.vx = Math.sign(opponent.x - f.x) * knockback;
-                opponent.vy = -10; // Launch up
-                opponent.isStunned = true;
-                audio?.playHit(true);
-            }
+            // Unblockable massive hit
+            opponent.health -= damage;
+            opponent.hitFlashTimer = 5;
+            
+            // Calculate vector away from explosion
+            const dx = (opponent.x + opponent.width/2) - (f.x + f.width/2);
+            const dy = (opponent.y + opponent.height/2) - (f.y + f.height/2);
+            const norm = Math.sqrt(dx*dx + dy*dy) || 1;
+            
+            opponent.vx = (dx/norm) * knockback;
+            opponent.vy = -10 - (chargeLevel * 10); // Launch up
+            opponent.isStunned = true;
+            audio?.playHit(true);
         }
 
-        // SELF RECOIL (Ground Slam if aerial)
-        if (!f.isGrounded) {
-             f.vy = 30; // Slam down
-        } else {
-             f.vy = -5; // Hop
-        }
-
-        // Reset Heat
-        f.heat = 0;
-        f.grappleCooldownTimer = 60; // Short CD for special reuse
+        // SELF RECOIL
+        f.vy = -5;
+        f.vx = 0; // Stop movement
+        f.heat = 0; // Reset heat
+        f.grappleCooldownTimer = 60; 
         audio?.playKO(); // Explosion sound
     }
 

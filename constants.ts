@@ -65,16 +65,16 @@ export const CLASS_STATS: Record<FighterClass, ClassStats> = {
         damageMult: 0.9,
         gravityScale: 0.6 // Very floaty
     },
-    KINETIC: { // THERMAL TANK (Replaces HEAVY)
-        speed: 3.0, // Slow
-        maxSpeed: 14, // Cap low
-        jumpForce: JUMP_FORCE * 0.9, // Heavy jump
-        dashSpeed: 45, // EXPLOSIVE short dash
-        dashDuration: 6, // Very short dash
+    KINETIC: { // THERMAL TANK
+        speed: 3.2, // Slow but steady
+        maxSpeed: 14, 
+        jumpForce: JUMP_FORCE * 0.9, 
+        dashSpeed: 40, // Explosive short dash
+        dashDuration: 8, 
         dashCooldown: 30,
-        health: 140, // Tanky
-        damageMult: 1.5, // Huge damage
-        gravityScale: 1.3 // Falls like a rock
+        health: 150, // Max Tanky
+        damageMult: 1.2, // Strong
+        gravityScale: 1.3 // Heavy fall
     }
 };
 
@@ -83,9 +83,9 @@ export const ATTACK_RANGE = 120;
 export const ATTACK_COOLDOWN = 10; 
 export const COMBO_WINDOW = 30; 
 
-// [Light, Medium, Heavy]
+// [Light, Medium, Heavy] - DAMAGE NERF for longer fights
 export const ATTACK_DURATIONS = [8, 10, 15]; 
-export const ATTACK_DAMAGES = [5, 8, 15];
+export const ATTACK_DAMAGES = [3, 6, 10]; // Reduced from 5, 8, 15
 export const ATTACK_KNOCKBACKS = [5, 8, 25]; 
 
 export const KNOCKBACK_FORCE = 15;
@@ -132,7 +132,7 @@ export const COLORS = {
   kinetic: {
     primary: '#f97316', // Orange Brûlé
     secondary: '#ea580c', // Rouille
-    glow: '#ffedd5',      // Blanc Chaud incandescent
+    glow: '#ffedd5',      // Blanc Chaud
   },
   enemy: {
     primary: '#4f46e5', // Electric Indigo
