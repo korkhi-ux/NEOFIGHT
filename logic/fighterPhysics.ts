@@ -40,74 +40,90 @@ export const updateFighter = (
     f.prevVx = f.vx;
     f.prevGrounded = f.isGrounded;
 
+    // --- VOLT MECHANICS ---
+    if (f.classType === 'VOLT') {
+        // SPECIAL: THUNDERCLAP (AOE Stun)
+        if (freshSpecial && f.grappleCooldownTimer <= 0) {
+            f.grappleCooldownTimer = 60; // 1 second cooldown
+            
+            // Visuals
+            createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.glow);
+            createParticles(gameState, f.x + f.width/2, f.y + f.height/2, 20, f.color.primary, 10);
+            gameState.shake += 10;
+            audio?.playGlitch(); // Electrical sound
+
+            // AOE Logic
+            const centerX = f.x + f.width/2;
+            const centerY = f.y + f.height/2;
+            const oppCenterX = opponent.x + opponent.width/2;
+            const oppCenterY = opponent.y + opponent.height/2;
+
+            const dist = Math.sqrt(Math.pow(centerX - oppCenterX, 2) + Math.pow(centerY - oppCenterY, 2));
+            
+            // Radius 140px
+            if (dist < 140) {
+                opponent.health -= 10;
+                opponent.hitFlashTimer = 5;
+                // Micro-Stun: Stop momentum
+                opponent.vx = 0;
+                opponent.vy = -2; // Tiny hop
+                // Pushback away from Volt
+                opponent.x += Math.sign(opponent.x - f.x) * 30;
+                createImpact(gameState, oppCenterX, oppCenterY, '#ffffff');
+            }
+        }
+    }
+
     // --- KINETIC MECHANICS: VELOCITY BERSERKER ---
     if (f.classType === 'KINETIC') {
         // 1. VELOCITY CONVERTER
-        // Calculate current speed magnitude
         const currentSpeed = Math.sqrt(f.vx*f.vx + f.vy*f.vy);
-        // Base damage 0.8x, scales up with speed. 
-        // At speed 18 (Max), modifier is ~2.0x.
         f.dynamicDamageMult = 0.8 + (currentSpeed / 15);
 
-        // 2. SPECIAL: BLAST ENGINE (Contextual)
-        // Cooldown handled by grappleCooldownTimer (90 frames ~ 1.5s)
+        // 2. SPECIAL: BLAST ENGINE
         if (freshSpecial && f.grappleCooldownTimer <= 0 && !f.isDiving) {
             f.grappleCooldownTimer = 90;
             
-            // CONTEXT A: GROUNDED -> BLAST JUMP
             if (f.isGrounded) {
                  f.vy = -28;
                  f.vx = f.facing * 18;
                  f.isGrounded = false;
-                 f.scaleX = 0.5; f.scaleY = 1.5; // Stretch
-                 
-                 // FX
+                 f.scaleX = 0.5; f.scaleY = 1.5; 
                  createShockwave(gameState, f.x + f.width/2, f.y + f.height, f.color.primary);
                  createParticles(gameState, f.x + f.width/2, f.y + f.height, 15, '#fbbf24', 5);
-                 audio?.playDash(); // Reuse sound
+                 audio?.playDash();
             } 
-            // CONTEXT B: AIRBORNE -> COMET DIVE
             else {
                  f.isDiving = true;
-                 f.vx = f.facing * 12; // Forward drift
-                 f.vy = 45; // Violent descent
-                 
-                 // Freeze frame illusion (optional, simplified here)
+                 f.vx = f.facing * 12; 
+                 f.vy = 45; 
                  createParticles(gameState, f.x + f.width/2, f.y, 10, '#ffffff', 2);
             }
         }
 
         // 3. COMET DIVE LANDING
         if (f.isDiving) {
-             // Trail
              if (gameState.frameCount % 2 === 0) {
                  createParticles(gameState, f.x + f.width/2, f.y, 2, f.color.glow, 4);
              }
 
              if (f.isGrounded || f.y >= GROUND_Y - f.height) {
-                 // IMPACT
                  f.isDiving = false;
                  f.vx = 0;
-                 
-                 // Visuals
                  gameState.shake += 12;
-                 createShockwave(gameState, f.x + f.width/2, f.y + f.height, '#ffffff'); // Primary
-                 createShockwave(gameState, f.x + f.width/2, f.y + f.height, f.color.primary); // Secondary
+                 createShockwave(gameState, f.x + f.width/2, f.y + f.height, '#ffffff'); 
+                 createShockwave(gameState, f.x + f.width/2, f.y + f.height, f.color.primary);
                  createParticles(gameState, f.x + f.width/2, f.y + f.height, 20, '#f97316', 10);
                  
-                 // AOE Damage (Manual check since this isn't a direct attack collision)
                  const dist = Math.sqrt(Math.pow((f.x + f.width/2) - (opponent.x + opponent.width/2), 2) + Math.pow((f.y + f.height) - (opponent.y + opponent.height), 2));
                  
                  if (dist < 250) {
-                     // DYNAMIC DAMAGE FOR DIVE
                      const diveDamage = 20 * (f.dynamicDamageMult ?? 1.0);
-                     
                      opponent.health -= diveDamage;
                      opponent.vx = Math.sign(opponent.x - f.x) * 20;
                      opponent.vy = -10;
                      opponent.hitFlashTimer = 5;
                      
-                     // Extra feedback for massive dive
                      if (diveDamage > 25) {
                          gameState.shake += 15;
                          audio?.playHit(true);
@@ -121,8 +137,7 @@ export const updateFighter = (
                          audio?.playKO();
                      }
                  }
-                 
-                 audio?.playHit(true); // Impact sound
+                 audio?.playHit(true); 
              }
         }
     } else {
@@ -132,6 +147,7 @@ export const updateFighter = (
     
     // Shared timer decrement
     if (f.classType === 'KINETIC' && f.grappleCooldownTimer > 0) f.grappleCooldownTimer -= timeScale;
+    if (f.classType === 'VOLT' && f.grappleCooldownTimer > 0) f.grappleCooldownTimer -= timeScale;
 
     // --- Effects: Friction & Landing ---
     if (f.isGrounded && justChangedDir) {
@@ -139,7 +155,6 @@ export const updateFighter = (
     }
     
     if (justLanded) {
-        // Kinetic landing impact (non-special)
         if (f.classType === 'KINETIC' && f.vy > 20) {
              gameState.shake += 2;
         }
@@ -160,50 +175,33 @@ export const updateFighter = (
 
     // --- VORTEX SPECIAL: VOID ORB ---
     if (f.classType === 'VORTEX' && f.voidOrb) {
-        // Orb Physics
         if (f.voidOrb.active) {
             f.voidOrb.life -= timeScale;
             f.voidOrb.x += f.voidOrb.vx * timeScale;
             f.voidOrb.y += f.voidOrb.vy * timeScale;
             
-            // Wall clamp for Orb
             if (f.voidOrb.x < 0) f.voidOrb.x = 0;
             if (f.voidOrb.x > WORLD_WIDTH) f.voidOrb.x = WORLD_WIDTH;
-
-            if (f.voidOrb.life <= 0) {
-                f.voidOrb.active = false;
-            }
+            if (f.voidOrb.life <= 0) f.voidOrb.active = false;
         }
 
         if (freshSpecial && f.grappleCooldownTimer <= 0) {
             if (!f.voidOrb.active) {
-                // SPAWN ORB
                 f.voidOrb.active = true;
-                f.voidOrb.life = 120; // 2 seconds
+                f.voidOrb.life = 120;
                 f.voidOrb.x = f.x + f.width/2;
                 f.voidOrb.y = f.y + f.height/2;
                 f.voidOrb.vx = f.facing * 15;
                 f.voidOrb.vy = 0;
-                
                 audio?.playGlitch();
             } else {
-                // TELEPORT TO ORB
                 createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.primary);
-                
                 f.x = f.voidOrb.x - f.width/2;
                 f.y = f.voidOrb.y - f.height/2;
-                
-                // Reset velocity slightly
-                f.vx = 0;
-                f.vy = 0;
-                f.isGrounded = false;
-                
-                // Visuals
-                f.scaleX = 0.2;
-                f.scaleY = 1.8;
+                f.vx = 0; f.vy = 0; f.isGrounded = false;
+                f.scaleX = 0.2; f.scaleY = 1.8;
                 f.voidOrb.active = false;
-                f.grappleCooldownTimer = 120; // Cooldown
-                
+                f.grappleCooldownTimer = 120; 
                 createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.glow);
                 audio?.playGlitch();
                 gameState.shake += 5;
@@ -213,36 +211,23 @@ export const updateFighter = (
 
     // --- SLINGER SPECIAL: TACTICAL GRAPPLE ---
     if (f.classType === 'SLINGER') {
-        
-        // 1. CANCEL / RELEASE (Slingshot Effect)
         if (freshSpecial && f.isGrappling) {
             f.isGrappling = false;
             f.grapplePoint = null;
             f.grappleTargetId = null;
             f.grappleCooldownTimer = GRAPPLE_COOLDOWN; 
-            
-            // SLINGSHOT BOOST: Preserve and amplify momentum
-            f.vx *= 1.2; 
-            f.vy *= 1.2;
-            
+            f.vx *= 1.2; f.vy *= 1.2;
             createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.glow);
         }
-        // 2. FIRE (Raycast) - Air or Ground
         else if (freshSpecial && !f.isGrappling && f.grappleCooldownTimer <= 0) {
-            
             const originX = f.x + f.width / 2;
-            // CENTER OF CHEST (Aligned with blade attacks)
             const originY = f.y + f.height * 0.55; 
-            
-            // Horizontal shot with slight angle
             const angleRad = (f.facing === 1 ? 0.1 : Math.PI - 0.1); 
             const dirX = Math.cos(angleRad);
-            const dirY = Math.sin(angleRad);
-
+            
             let hitPoint: {x: number, y: number} | null = null;
             let hitTargetId: string | null = null;
             
-            // A. Check Enemy Hit
             const distOpp = Math.sqrt(Math.pow(opponent.x - f.x, 2) + Math.pow(opponent.y - f.y, 2));
             const inRange = distOpp < GRAPPLE_RANGE;
             const dxOpp = opponent.x - f.x;
@@ -251,12 +236,9 @@ export const updateFighter = (
             if (inFront && inRange) {
                 hitPoint = { x: opponent.x + opponent.width/2, y: opponent.y + opponent.height/2 };
                 hitTargetId = opponent.id;
-            } 
-            // B. Check Walls
-            else {
+            } else {
                 const targetWallX = f.facing === 1 ? WORLD_WIDTH : 0;
                 const distToWallX = targetWallX - originX;
-                
                 hitPoint = { x: targetWallX, y: originY + (distToWallX * Math.tan(angleRad)) };
                 if (hitPoint.y > GROUND_Y) hitPoint.y = GROUND_Y;
             }
@@ -266,26 +248,17 @@ export const updateFighter = (
                 f.grapplePoint = hitPoint;
                 f.grappleTargetId = hitTargetId;
                 f.isGrounded = false;
-                
                 createShockwave(gameState, hitPoint.x, hitPoint.y, f.color.glow);
                 createParticles(gameState, hitPoint.x, hitPoint.y, 12, f.color.glow, 8);
-                
-                f.vx += dirX * 5; // Stronger initial kick
-                f.vy -= 8; // Hop
+                f.vx += dirX * 5; f.vy -= 8;
             } else {
                 f.grappleCooldownTimer = 15; 
             }
         } 
-        
-        // 3. UPDATE PHYSICS (While grappling)
         else if (f.isGrappling && f.grapplePoint) {
             if (f.grappleTargetId) {
-                f.grapplePoint = { 
-                    x: opponent.x + opponent.width/2, 
-                    y: opponent.y + opponent.height/2 
-                };
+                f.grapplePoint = { x: opponent.x + opponent.width/2, y: opponent.y + opponent.height/2 };
             }
-
             const dx = f.grapplePoint.x - (f.x + f.width/2);
             const dy = f.grapplePoint.y - f.y; 
             const dist = Math.sqrt(dx*dx + dy*dy);
@@ -295,22 +268,16 @@ export const updateFighter = (
                 f.grapplePoint = null;
                 f.grappleTargetId = null;
                 f.grappleCooldownTimer = GRAPPLE_COOLDOWN; 
-                
-                f.vx *= 0.8; 
-                f.vy *= 0.8;
+                f.vx *= 0.8; f.vy *= 0.8;
             } else {
-                // EXTREME ELASTIC PULL - ZIP EFFECT
-                const pullForce = 4.0 * timeScale; // Violent pull
+                const pullForce = 4.0 * timeScale;
                 const angle = Math.atan2(dy, dx);
-                
                 f.vx += Math.cos(angle) * pullForce;
                 f.vy += Math.sin(angle) * pullForce;
-                
                 const speed = Math.sqrt(f.vx*f.vx + f.vy*f.vy);
                 if (speed > GRAPPLE_MAX_SPEED) {
                     const r = GRAPPLE_MAX_SPEED / speed;
-                    f.vx *= r;
-                    f.vy *= r;
+                    f.vx *= r; f.vy *= r;
                 }
             }
         }
@@ -354,24 +321,18 @@ export const updateFighter = (
       const dashDir = input.x !== 0 ? Math.sign(input.x) : f.facing;
       f.facing = dashDir as 1 | -1;
 
-      // KINETIC: ROCKET DASH
       if (f.classType === 'KINETIC') {
-          gameState.shake += 5; // Engine roar shake
+          gameState.shake += 5; 
           audio?.playDash();
-          // No teleport, purely physics boost handled below
       }
 
-      // VORTEX "QUANTUM BLINK" START
       if (f.classType === 'VORTEX') {
-          f.scaleX = 0.1; // Implosion start
-          f.scaleY = 0.1;
+          f.scaleX = 0.1; f.scaleY = 0.1;
           audio?.playGlitch();
-          f.vx = 0;
-          f.vy = 0;
+          f.vx = 0; f.vy = 0;
       } else {
           if (f.classType !== 'KINETIC') audio?.playDash();
-          f.scaleX = 1.7; 
-          f.scaleY = 0.4; 
+          f.scaleX = 1.7; f.scaleY = 0.4; 
       }
     }
 
@@ -437,30 +398,22 @@ export const updateFighter = (
     if (f.isDashing) {
       f.dashTimer -= timeScale;
       
-      // VORTEX "QUANTUM BLINK" EXECUTION
       if (f.classType === 'VORTEX') {
-          f.vx = 0;
-          f.vy = 0;
+          f.vx = 0; f.vy = 0;
           const teleportFrame = stats.dashDuration - 5;
-          
           if (f.dashTimer <= teleportFrame && f.dashTimer > teleportFrame - timeScale) {
                f.x += f.facing * 350;
                if (f.x < 0) f.x = 0;
                if (f.x + f.width > WORLD_WIDTH) f.x = WORLD_WIDTH - f.width;
-               
-               f.scaleX = 1.6;
-               f.scaleY = 0.6;
+               f.scaleX = 1.6; f.scaleY = 0.6;
                gameState.shake += 5;
                audio?.playGlitch();
                createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.primary);
           }
-          
           if (f.dashTimer > teleportFrame) {
-              f.scaleX = 0.1;
-              f.scaleY = 0.1;
+              f.scaleX = 0.1; f.scaleY = 0.1;
           }
       } else {
-          // Standard & Kinetic Dash
           f.vx = f.facing * stats.dashSpeed;
           f.vy = 0; 
       }
@@ -515,14 +468,9 @@ export const updateFighter = (
             createParticles(gameState, 0, f.y + f.height/2, 5, '#ffffff', 5);
             f.scaleX = 0.8; 
         }
-        f.x = 0; 
-        f.vx = 0; 
+        f.x = 0; f.vx = 0; 
         if (f.isGrappling || f.isDiving) {
-            f.isGrappling = false;
-            f.isDiving = false;
-            f.grapplePoint = null;
-            f.grappleTargetId = null;
-            f.grappleCooldownTimer = GRAPPLE_COOLDOWN; 
+            f.isGrappling = false; f.isDiving = false; f.grapplePoint = null; f.grappleTargetId = null; f.grappleCooldownTimer = GRAPPLE_COOLDOWN; 
         }
     }
     if (f.x + f.width > WORLD_WIDTH) { 
@@ -530,14 +478,9 @@ export const updateFighter = (
             createParticles(gameState, WORLD_WIDTH, f.y + f.height/2, 5, '#ffffff', 5);
             f.scaleX = 0.8; 
         }
-        f.x = WORLD_WIDTH - f.width; 
-        f.vx = 0; 
+        f.x = WORLD_WIDTH - f.width; f.vx = 0; 
         if (f.isGrappling || f.isDiving) { 
-            f.isGrappling = false;
-            f.isDiving = false;
-            f.grapplePoint = null;
-            f.grappleTargetId = null;
-            f.grappleCooldownTimer = GRAPPLE_COOLDOWN; 
+            f.isGrappling = false; f.isDiving = false; f.grapplePoint = null; f.grappleTargetId = null; f.grappleCooldownTimer = GRAPPLE_COOLDOWN; 
         }
     }
 

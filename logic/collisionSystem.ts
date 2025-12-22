@@ -52,6 +52,24 @@ const handleHit = (
 ) => {
     if (defender.isDashing) return; 
 
+    // --- VOLT MECHANIC: STATIC FLOW (DASH RESET) ---
+    if (attacker.classType === 'VOLT') {
+        attacker.dashCooldown = 0; // RESET
+        attacker.hitFlashTimer = 2; // Brief flash to confirm reset
+        
+        // High pitch beep for feedback
+        if (audio && audio.ctx.state === 'running') {
+            const osc = audio.ctx.createOscillator();
+            const g = audio.ctx.createGain();
+            osc.frequency.value = 1200;
+            g.gain.value = 0.1;
+            osc.connect(g);
+            g.connect(audio.masterGain);
+            osc.start();
+            osc.stop(audio.ctx.currentTime + 0.05);
+        }
+    }
+
     const impactX = defender.x + defender.width/2;
     const impactY = defender.y + defender.height/2;
 

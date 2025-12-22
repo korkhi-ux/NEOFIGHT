@@ -8,7 +8,7 @@ export default function App() {
   const [gameState, setGameState] = useState<'menu' | 'playing' | 'gameover'>('menu');
   const [winner, setWinner] = useState<'player' | 'enemy' | null>(null);
   const [scores, setScores] = useState({ player: 0, enemy: 0 });
-  const [selectedClass, setSelectedClass] = useState<FighterClass>('STANDARD');
+  const [selectedClass, setSelectedClass] = useState<FighterClass>('VOLT');
 
   const startGame = () => {
     setGameState('playing');
@@ -145,10 +145,10 @@ export default function App() {
 
           {/* CLASS SELECTOR */}
           <div className="z-10 flex gap-4 mb-12">
-               <button onClick={() => setSelectedClass('STANDARD')} className={`class-btn flex flex-col items-center p-4 w-32 ${selectedClass === 'STANDARD' ? 'active' : ''}`}>
+               <button onClick={() => setSelectedClass('VOLT')} className={`class-btn flex flex-col items-center p-4 w-32 ${selectedClass === 'VOLT' ? 'active' : ''}`}>
                    <Sword className="w-8 h-8 text-cyan-400 mb-2"/>
-                   <span className="text-xs font-bold text-white tracking-widest">STANDARD</span>
-                   <span className="text-[9px] text-white/50 mt-1">BALANCED</span>
+                   <span className="text-xs font-bold text-white tracking-widest">VOLT</span>
+                   <span className="text-[9px] text-white/50 mt-1">SPEED / RESET</span>
                </button>
                <button onClick={() => setSelectedClass('SLINGER')} className={`class-btn flex flex-col items-center p-4 w-32 ${selectedClass === 'SLINGER' ? 'active' : ''}`}>
                    <Wind className="w-8 h-8 text-yellow-400 mb-2"/>
@@ -203,6 +203,9 @@ export default function App() {
                 </span>
                 <span className="flex items-center gap-2">
                     <span className="key-cap" style={{width: '60px'}}>SPACE</span> DASH
+                </span>
+                <span className="flex items-center gap-2">
+                    R-CLICK : SPECIAL
                 </span>
              </div>
           </div>

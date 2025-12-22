@@ -73,7 +73,7 @@ export interface AIState {
 }
 
 // --- CLASS SYSTEM TYPES ---
-export type FighterClass = 'STANDARD' | 'SLINGER' | 'VORTEX' | 'KINETIC';
+export type FighterClass = 'VOLT' | 'SLINGER' | 'VORTEX' | 'KINETIC';
 
 export interface VoidOrb {
   x: number;
@@ -86,7 +86,7 @@ export interface VoidOrb {
 
 export interface Fighter {
   id: 'player' | 'enemy';
-  classType: FighterClass; // New: Class definition
+  classType: FighterClass; 
   
   x: number;
   y: number;

@@ -10,7 +10,7 @@ import { checkCollisions } from '../logic/collisionSystem';
 import { updateCamera } from '../rendering/cameraSystem';
 import { renderGame } from '../rendering/gameRenderer';
 
-const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClass = 'STANDARD'): Fighter => {
+const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClass = 'VOLT'): Fighter => {
   const stats = CLASS_STATS[classType];
   
   // Determine color based on class and ID
@@ -19,11 +19,14 @@ const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClas
   if (id === 'enemy') {
       colorSet = COLORS.enemy;
   } else {
-      // Dynamic color assignment based on class
-      if (classType === 'KINETIC') colorSet = COLORS.kinetic;
-      else if (classType === 'VORTEX') colorSet = COLORS.vortex;
-      else if (classType === 'SLINGER') colorSet = COLORS.slinger;
-      else colorSet = COLORS.player; // STANDARD
+      // Dynamic color assignment based on class string
+      const classKey = classType.toLowerCase() as keyof typeof COLORS;
+      const theme = COLORS[classKey];
+      
+      // Ensure we have a valid color object (filters out string values in COLORS)
+      if (theme && typeof theme === 'object') {
+          colorSet = theme;
+      }
   }
   
   return {
@@ -97,7 +100,7 @@ export const useGameLoop = (
     canvasRef: React.RefObject<HTMLCanvasElement>,
     gameActive: boolean,
     onGameOver: (winner: 'player' | 'enemy', pScore: number, eScore: number) => void,
-    playerClass: FighterClass = 'KINETIC' // Defaulted to KINETIC for testing
+    playerClass: FighterClass = 'VOLT' // Defaulted to VOLT
 ) => {
     const inputManager = useRef(new InputManager());
     const audioManager = useRef<AudioManager | null>(null);
@@ -106,7 +109,7 @@ export const useGameLoop = (
     const gameState = useRef<GameState>({
         // START POSITIONS: Center of map +/- 200px (Closer start)
         player: createFighter('player', WORLD_WIDTH / 2 - 200, playerClass),
-        enemy: createFighter('enemy', WORLD_WIDTH / 2 + 200, 'STANDARD'), 
+        enemy: createFighter('enemy', WORLD_WIDTH / 2 + 200, 'VOLT'), 
         particles: [],
         shockwaves: [],
         impacts: [],
@@ -142,7 +145,7 @@ export const useGameLoop = (
         gameState.current = {
             ...gameState.current,
             player: { ...createFighter('player', WORLD_WIDTH / 2 - 200, playerClass), score: currentPScore },
-            enemy: { ...createFighter('enemy', WORLD_WIDTH / 2 + 200, 'STANDARD'), score: currentEScore },
+            enemy: { ...createFighter('enemy', WORLD_WIDTH / 2 + 200, 'VOLT'), score: currentEScore },
             gameActive: true,
             winner: null,
             slowMoFactor: 1.0,
