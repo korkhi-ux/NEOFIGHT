@@ -1,5 +1,5 @@
 
-import { ATTACK_RANGE, ATTACK_DURATIONS, ATTACK_DAMAGES, ATTACK_KNOCKBACKS, HIT_FLASH_DURATION } from '../constants';
+import { ATTACK_RANGE, ATTACK_DURATIONS, ATTACK_DAMAGES, ATTACK_KNOCKBACKS, HIT_FLASH_DURATION, CLASS_STATS } from '../constants';
 import { Fighter, GameState } from '../types';
 import { AudioManager } from '../core/AudioManager';
 import { createImpact, createParticles, createShockwave, createFlare } from './effectSpawners';
@@ -57,8 +57,7 @@ const handleHit = (
 
     // Visuals
     defender.hitFlashTimer = HIT_FLASH_DURATION; 
-    audio?.playHit(attacker.comboCount === 2);
-
+    
     const dx = defender.x - attacker.x;
     const dy = defender.y - attacker.y;
     const dist = Math.sqrt(dx*dx + dy*dy) || 1;
@@ -67,25 +66,33 @@ const handleHit = (
     
     createImpact(gameState, impactX, impactY, '#ffffff');
 
-    if (attacker.comboCount === 2) {
-        gameState.chromaticAberration = 8; // Reduced noise (was 15)
-        gameState.shake = 30;
+    // --- DAMAGE CALCULATION ---
+    let baseDamage = ATTACK_DAMAGES[attacker.comboCount];
+    
+    // Apply Class Multiplier OR Dynamic Velocity Multiplier
+    // If Kinetic, dynamicDamageMult is active (0.8x to ~2.5x).
+    // If others, use static class multiplier (e.g. 1.0).
+    const multiplier = attacker.dynamicDamageMult ?? CLASS_STATS[attacker.classType].damageMult;
+    
+    const finalDamage = baseDamage * multiplier;
+
+    // --- HIGH VELOCITY FEEDBACK ---
+    const isHeavyHit = attacker.comboCount === 2 || multiplier > 1.5;
+
+    if (isHeavyHit) {
+        gameState.chromaticAberration = 8;
+        gameState.shake = 30; // Stronger shake
         createFlare(gameState, impactX, impactY, attacker.color.glow); 
+        audio?.playHit(true); // Heavy Sound
     } else {
         gameState.shake = 10;
+        audio?.playHit(false); // Light Sound
     }
 
-    // Physics
-    let damage = ATTACK_DAMAGES[attacker.comboCount];
-    
-    // Apply Velocity Converter Multiplier
-    if (attacker.dynamicDamageMult) {
-        damage *= attacker.dynamicDamageMult;
-    }
-
+    // Physics Application
     const knockback = ATTACK_KNOCKBACKS[attacker.comboCount];
 
-    defender.health -= damage;
+    defender.health -= finalDamage;
     defender.vx = attacker.facing * knockback;
     defender.vy = -5;
     

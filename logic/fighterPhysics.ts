@@ -99,14 +99,24 @@ export const updateFighter = (
                  const dist = Math.sqrt(Math.pow((f.x + f.width/2) - (opponent.x + opponent.width/2), 2) + Math.pow((f.y + f.height) - (opponent.y + opponent.height), 2));
                  
                  if (dist < 250) {
-                     opponent.health -= 20;
+                     // DYNAMIC DAMAGE FOR DIVE
+                     const diveDamage = 20 * (f.dynamicDamageMult ?? 1.0);
+                     
+                     opponent.health -= diveDamage;
                      opponent.vx = Math.sign(opponent.x - f.x) * 20;
                      opponent.vy = -10;
                      opponent.hitFlashTimer = 5;
-                     audio?.playHit(true);
+                     
+                     // Extra feedback for massive dive
+                     if (diveDamage > 25) {
+                         gameState.shake += 15;
+                         audio?.playHit(true);
+                     } else {
+                         audio?.playHit(false);
+                     }
                      
                      if (opponent.health <= 0) {
-                         opponent.isDead = true; // Simple kill check, collisionSystem handles full KO flow usually
+                         opponent.isDead = true; 
                          gameState.winner = f.id;
                          audio?.playKO();
                      }
