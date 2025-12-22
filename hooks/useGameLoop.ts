@@ -17,7 +17,6 @@ const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClas
   if (id === 'player') {
       if (classType === 'SLINGER') colorSet = COLORS.slinger;
       if (classType === 'VORTEX') colorSet = COLORS.vortex;
-      if (classType === 'KINETIC') colorSet = COLORS.kinetic;
   }
   
   return {
@@ -50,9 +49,6 @@ const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClas
         vy: 0,
         life: 0
     } : undefined,
-
-    // KINETIC
-    heat: classType === 'KINETIC' ? 0 : undefined,
     
     aiState: id === 'enemy' ? {
         mode: 'neutral', 

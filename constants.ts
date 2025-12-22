@@ -65,16 +65,16 @@ export const CLASS_STATS: Record<FighterClass, ClassStats> = {
         damageMult: 0.9,
         gravityScale: 0.6 // Very floaty
     },
-    KINETIC: { // THERMAL TANK
-        speed: 3.2, // Slow but steady
-        maxSpeed: 14, 
-        jumpForce: JUMP_FORCE * 0.9, 
-        dashSpeed: 40, // Explosive short dash
-        dashDuration: 8, 
+    KINETIC: { // Velocity Berserker
+        speed: 4.0, // Top Tier base speed
+        maxSpeed: 22, // Highest max speed
+        jumpForce: JUMP_FORCE, 
+        dashSpeed: 50, // Violent Acceleration
+        dashDuration: 8,
         dashCooldown: 30,
-        health: 150, // Max Tanky
-        damageMult: 1.2, // Strong
-        gravityScale: 1.3 // Heavy fall
+        health: 120, // Standard+
+        damageMult: 1.0, // Variable based on speed
+        gravityScale: 1.4 // Comet Dive Feel (Heavy)
     }
 };
 
@@ -83,9 +83,9 @@ export const ATTACK_RANGE = 120;
 export const ATTACK_COOLDOWN = 10; 
 export const COMBO_WINDOW = 30; 
 
-// [Light, Medium, Heavy] - DAMAGE NERF for longer fights
+// [Light, Medium, Heavy] - NERFED GLOBAL DAMAGE FOR PACING
 export const ATTACK_DURATIONS = [8, 10, 15]; 
-export const ATTACK_DAMAGES = [3, 6, 10]; // Reduced from 5, 8, 15
+export const ATTACK_DAMAGES = [3, 6, 10]; 
 export const ATTACK_KNOCKBACKS = [5, 8, 25]; 
 
 export const KNOCKBACK_FORCE = 15;
@@ -130,9 +130,9 @@ export const COLORS = {
     glow: '#d946ef',      // Electric Magenta
   },
   kinetic: {
-    primary: '#f97316', // Orange Brûlé
-    secondary: '#ea580c', // Rouille
-    glow: '#ffedd5',      // Blanc Chaud
+    primary: '#f97316', // Orange Mécanique
+    secondary: '#475569', // Acier Sombre
+    glow: '#fbbf24',      // Ambre Électrique
   },
   enemy: {
     primary: '#4f46e5', // Electric Indigo

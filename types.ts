@@ -121,7 +121,8 @@ export interface Fighter {
   voidOrb?: VoidOrb;
 
   // KINETIC Mechanics
-  heat?: number; // 0 to 100
+  isDiving?: boolean; // Comet Dive State
+  dynamicDamageMult?: number; // Velocity Converter
 
   // Previous Frame State (for friction/landing particles)
   prevVx: number;

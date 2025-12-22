@@ -2,48 +2,68 @@
 import { Fighter, GameState } from '../types';
 
 export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState: GameState) => {
-    const bodyW = f.width;
-    const bodyH = f.height;
     
-    // --- KINETIC VFX: THERMAL MIST AURA (Render Behind) ---
-    if (f.classType === 'KINETIC' && f.heat !== undefined && f.heat > 0) {
-        const heatRatio = f.heat / 100;
-        
+    // --- KINETIC VFX ---
+    const isKinetic = f.classType === 'KINETIC';
+    const speed = Math.sqrt(f.vx*f.vx + f.vy*f.vy);
+    
+    if (isKinetic) {
         ctx.save();
-        ctx.translate(f.x + bodyW/2, f.y + bodyH/2);
-        
-        // Mist Color Interpolation
-        let mistColor = '255, 255, 255'; // White default
-        if (f.heat > 30 && f.heat <= 70) mistColor = '255, 165, 0'; // Orange
-        if (f.heat > 70) mistColor = '255, 0, 0'; // Red
-        
-        const count = 3 + Math.floor(heatRatio * 5); // More circles with heat
-        
-        for(let i=0; i<count; i++) {
-             // Noise movement
-             const t = gameState.frameCount * 0.05 + i;
-             const ox = Math.sin(t) * 10 * (1 + heatRatio);
-             const oy = Math.cos(t * 1.3) * 10 * (1 + heatRatio);
+        ctx.translate(f.x + f.width/2, f.y + f.height/2);
+
+        // 1. SPEED LINES (Velocity > 12)
+        if (speed > 12) {
+             ctx.globalAlpha = Math.min(0.6, (speed - 12) / 10);
+             ctx.strokeStyle = '#ffffff';
+             ctx.lineWidth = 2;
              
-             // Radius grows with heat
-             const r = 30 + (heatRatio * 50) + Math.sin(t * 2) * 5;
+             // Draw lines opposite to movement
+             const angle = Math.atan2(f.vy, f.vx);
+             const backX = -Math.cos(angle);
+             const backY = -Math.sin(angle);
              
-             ctx.beginPath();
-             ctx.arc(ox, oy - 20, r, 0, Math.PI * 2);
-             
-             // Core darker if overheated
-             if (f.heat > 80 && i % 2 === 0) {
-                 ctx.fillStyle = `rgba(20, 0, 0, 0.3)`;
-             } else {
-                 ctx.fillStyle = `rgba(${mistColor}, 0.15)`;
+             for(let i=0; i<3; i++) {
+                 const offset = (gameState.frameCount * 20 + i * 50) % 100;
+                 const sx = (Math.random() - 0.5) * 40;
+                 const sy = (Math.random() - 0.5) * 40;
+                 
+                 ctx.beginPath();
+                 ctx.moveTo(sx, sy);
+                 ctx.lineTo(sx + backX * (50 + offset), sy + backY * (50 + offset));
+                 ctx.stroke();
              }
-             
-             ctx.fill();
         }
         
+        // 2. POST-COMBUSTION (Dash or Blast Jump)
+        // Detect high acceleration state implicitly via high speed or flags
+        if (f.isDashing || (!f.isGrounded && speed > 20)) {
+            const angle = Math.atan2(f.vy, f.vx);
+            
+            ctx.rotate(angle);
+            ctx.fillStyle = '#f97316'; // Orange
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#fbbf24'; // Amber
+            
+            // Draw Cone behind
+            ctx.beginPath();
+            ctx.moveTo(-30, 0); // Origin (near back of player)
+            ctx.lineTo(-80 - Math.random() * 20, -15);
+            ctx.lineTo(-80 - Math.random() * 20, 15);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Inner White Core
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.moveTo(-30, 0);
+            ctx.lineTo(-60, -5);
+            ctx.lineTo(-60, 5);
+            ctx.fill();
+        }
+
         ctx.restore();
     }
-    
+
     // --- VORTEX: VOID ORB RENDER ---
     if (f.classType === 'VORTEX' && f.voidOrb && f.voidOrb.active) {
         const { x, y } = f.voidOrb;
@@ -77,7 +97,6 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
              const px = Math.cos(angle) * dist;
              const py = Math.sin(angle) * dist;
              ctx.fillRect(px, py, 4, 4);
-             // Note: These are purely visual per frame, no persistent state needed for simple suction
         }
 
         ctx.restore();
@@ -213,9 +232,12 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
         ctx.shadowColor = f.color.glow;
     }
 
-    // Body Render
+    const bodyW = f.width;
+    const bodyH = f.height;
+
+    // Body Render (GLITCH vs NORMAL)
     if (f.classType === 'VORTEX') {
-        // --- GLITCH BODY (VORTEX) ---
+        // --- GLITCH BODY ---
         ctx.fillStyle = f.color.primary;
         ctx.strokeStyle = f.color.glow;
         
@@ -230,25 +252,6 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
         ctx.lineWidth = 1;
         ctx.shadowBlur = 0;
         ctx.strokeRect((-bodyW/2), -bodyH, bodyW, bodyH);
-
-    } else if (f.classType === 'KINETIC') {
-        // --- BULKY BODY (KINETIC) ---
-        // Same width as standard, just visual bulk via shape
-        const bulkW = bodyW;
-        
-        ctx.fillStyle = f.color.primary;
-        ctx.beginPath();
-        // Slightly trapezoid for heaviness
-        ctx.moveTo(-bulkW/2 + 2, -bodyH);
-        ctx.lineTo(bulkW/2 - 2, -bodyH);
-        ctx.lineTo(bulkW/2 + 4, 0); // Wider base
-        ctx.lineTo(-bulkW/2 - 4, 0);
-        ctx.closePath();
-        ctx.fill();
-        
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = f.color.secondary;
-        ctx.stroke();
 
     } else {
         // --- STANDARD BODY ---
@@ -268,9 +271,7 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
         ctx.shadowBlur = 5;
         ctx.shadowColor = '#fff';
         const eyeOffset = f.facing === 1 ? bodyW/4 : -bodyW/4 - 10;
-        // Adjust eyes for Kinetic
-        const eyeY = f.classType === 'KINETIC' ? -bodyH * 0.8 + 20 : -bodyH + 20;
-        ctx.fillRect(eyeOffset, eyeY, 15, 4);
+        ctx.fillRect(eyeOffset, -bodyH + 20, 15, 4);
     }
 
     // --- ANIME NEEDLE BLADES (Attacks) ---

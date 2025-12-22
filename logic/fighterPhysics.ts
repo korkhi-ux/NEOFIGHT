@@ -40,30 +40,88 @@ export const updateFighter = (
     f.prevVx = f.vx;
     f.prevGrounded = f.isGrounded;
 
-    // --- KINETIC: THERMAL CORE PASSIVE ---
-    if (f.classType === 'KINETIC' && f.heat !== undefined) {
-        // 1. Gain Heat from Movement (Ground Friction)
-        if (f.isGrounded && Math.abs(f.vx) > 1) {
-            f.heat += Math.abs(f.vx) * 0.08 * timeScale;
-        } 
-        // Decay Heat if idle
-        else if (Math.abs(f.vx) < 1 && f.heat > 0) {
-            f.heat -= 0.1 * timeScale;
+    // --- KINETIC MECHANICS: VELOCITY BERSERKER ---
+    if (f.classType === 'KINETIC') {
+        // 1. VELOCITY CONVERTER
+        // Calculate current speed magnitude
+        const currentSpeed = Math.sqrt(f.vx*f.vx + f.vy*f.vy);
+        // Base damage 0.8x, scales up with speed. 
+        // At speed 18 (Max), modifier is ~2.0x.
+        f.dynamicDamageMult = 0.8 + (currentSpeed / 15);
+
+        // 2. SPECIAL: BLAST ENGINE (Contextual)
+        // Cooldown handled by grappleCooldownTimer (90 frames ~ 1.5s)
+        if (freshSpecial && f.grappleCooldownTimer <= 0 && !f.isDiving) {
+            f.grappleCooldownTimer = 90;
+            
+            // CONTEXT A: GROUNDED -> BLAST JUMP
+            if (f.isGrounded) {
+                 f.vy = -28;
+                 f.vx = f.facing * 18;
+                 f.isGrounded = false;
+                 f.scaleX = 0.5; f.scaleY = 1.5; // Stretch
+                 
+                 // FX
+                 createShockwave(gameState, f.x + f.width/2, f.y + f.height, f.color.primary);
+                 createParticles(gameState, f.x + f.width/2, f.y + f.height, 15, '#fbbf24', 5);
+                 audio?.playDash(); // Reuse sound
+            } 
+            // CONTEXT B: AIRBORNE -> COMET DIVE
+            else {
+                 f.isDiving = true;
+                 f.vx = f.facing * 12; // Forward drift
+                 f.vy = 45; // Violent descent
+                 
+                 // Freeze frame illusion (optional, simplified here)
+                 createParticles(gameState, f.x + f.width/2, f.y, 10, '#ffffff', 2);
+            }
         }
 
-        // 2. Gain Heat from Braking (Friction)
-        if (f.isGrounded && justChangedDir) {
-            f.heat += 5;
-            createParticles(gameState, f.x + f.width/2, f.y + f.height, 3, f.color.secondary, 2);
-        }
+        // 3. COMET DIVE LANDING
+        if (f.isDiving) {
+             // Trail
+             if (gameState.frameCount % 2 === 0) {
+                 createParticles(gameState, f.x + f.width/2, f.y, 2, f.color.glow, 4);
+             }
 
-        f.heat = Math.max(0, Math.min(100, f.heat));
-
-        // Overheat Visual (Smoke) - No Self Damage in this version
-        if (f.heat > 50 && Math.random() < (f.heat / 200)) {
-             createParticles(gameState, f.x + Math.random()*f.width, f.y + Math.random()*f.height, 1, '#ffffff', 2);
+             if (f.isGrounded || f.y >= GROUND_Y - f.height) {
+                 // IMPACT
+                 f.isDiving = false;
+                 f.vx = 0;
+                 
+                 // Visuals
+                 gameState.shake += 12;
+                 createShockwave(gameState, f.x + f.width/2, f.y + f.height, '#ffffff'); // Primary
+                 createShockwave(gameState, f.x + f.width/2, f.y + f.height, f.color.primary); // Secondary
+                 createParticles(gameState, f.x + f.width/2, f.y + f.height, 20, '#f97316', 10);
+                 
+                 // AOE Damage (Manual check since this isn't a direct attack collision)
+                 const dist = Math.sqrt(Math.pow((f.x + f.width/2) - (opponent.x + opponent.width/2), 2) + Math.pow((f.y + f.height) - (opponent.y + opponent.height), 2));
+                 
+                 if (dist < 250) {
+                     opponent.health -= 20;
+                     opponent.vx = Math.sign(opponent.x - f.x) * 20;
+                     opponent.vy = -10;
+                     opponent.hitFlashTimer = 5;
+                     audio?.playHit(true);
+                     
+                     if (opponent.health <= 0) {
+                         opponent.isDead = true; // Simple kill check, collisionSystem handles full KO flow usually
+                         gameState.winner = f.id;
+                         audio?.playKO();
+                     }
+                 }
+                 
+                 audio?.playHit(true); // Impact sound
+             }
         }
+    } else {
+        f.dynamicDamageMult = 1.0;
+        if (f.grappleCooldownTimer > 0) f.grappleCooldownTimer -= timeScale;
     }
+    
+    // Shared timer decrement
+    if (f.classType === 'KINETIC' && f.grappleCooldownTimer > 0) f.grappleCooldownTimer -= timeScale;
 
     // --- Effects: Friction & Landing ---
     if (f.isGrounded && justChangedDir) {
@@ -71,18 +129,13 @@ export const updateFighter = (
     }
     
     if (justLanded) {
-        // KINETIC: Heavy Landing
-        if (f.classType === 'KINETIC') {
-            createParticles(gameState, f.x + f.width/2, f.y + f.height, 15, f.color.glow, 5);
-            f.scaleX = 1.3; 
-            f.scaleY = 0.5; // Pronounced heavy squash
-            gameState.shake += 5; // Ground Shake
-            audio?.playHit(true); // Thud sound
-        } else {
-            createParticles(gameState, f.x + f.width/2, f.y + f.height, 8, '#ffffff', 3);
-            f.scaleX = 1.5; 
-            f.scaleY = 0.5; 
+        // Kinetic landing impact (non-special)
+        if (f.classType === 'KINETIC' && f.vy > 20) {
+             gameState.shake += 2;
         }
+        createParticles(gameState, f.x + f.width/2, f.y + f.height, 8, '#ffffff', 3);
+        f.scaleX = 1.5; 
+        f.scaleY = 0.5; 
     }
 
     // --- Timers ---
@@ -90,54 +143,9 @@ export const updateFighter = (
     if (f.attackCooldown > 0) f.attackCooldown -= timeScale;
     if (f.comboTimer > 0) f.comboTimer -= timeScale;
     if (f.hitFlashTimer > 0) f.hitFlashTimer -= timeScale;
-    if (f.grappleCooldownTimer > 0) f.grappleCooldownTimer -= timeScale;
-
+    
     if (f.comboTimer <= 0 && !f.isAttacking) {
         f.comboCount = 0;
-    }
-
-    // --- KINETIC SPECIAL: SEISMIC DISCHARGE ---
-    if (f.classType === 'KINETIC' && freshSpecial && f.heat !== undefined) {
-        // Must have some heat to explode
-        const chargeLevel = Math.max(0.2, f.heat / 100); 
-        
-        // Explosion Properties
-        const radius = 150 + (chargeLevel * 250); // 150 to 400px
-        const damage = 15 + (chargeLevel * 30); // 15 to 45 dmg
-        const knockback = 20 + (chargeLevel * 30);
-        
-        // VISUALS
-        createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.glow);
-        createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.primary);
-        createParticles(gameState, f.x + f.width/2, f.y + f.height/2, 30, f.color.secondary, 20 * chargeLevel);
-        gameState.shake += 15 + (15 * chargeLevel);
-        createFlare(gameState, f.x + f.width/2, f.y + f.height/2, f.color.primary);
-
-        // AOE HIT DETECTION
-        const distOpp = Math.sqrt(Math.pow((opponent.x + opponent.width/2) - (f.x + f.width/2), 2) + Math.pow((opponent.y + opponent.height/2) - (f.y + f.height/2), 2));
-        
-        if (distOpp < radius) {
-            // Unblockable massive hit
-            opponent.health -= damage;
-            opponent.hitFlashTimer = 5;
-            
-            // Calculate vector away from explosion
-            const dx = (opponent.x + opponent.width/2) - (f.x + f.width/2);
-            const dy = (opponent.y + opponent.height/2) - (f.y + f.height/2);
-            const norm = Math.sqrt(dx*dx + dy*dy) || 1;
-            
-            opponent.vx = (dx/norm) * knockback;
-            opponent.vy = -10 - (chargeLevel * 10); // Launch up
-            opponent.isStunned = true;
-            audio?.playHit(true);
-        }
-
-        // SELF RECOIL
-        f.vy = -5;
-        f.vx = 0; // Stop movement
-        f.heat = 0; // Reset heat
-        f.grappleCooldownTimer = 60; 
-        audio?.playKO(); // Explosion sound
     }
 
     // --- VORTEX SPECIAL: VOID ORB ---
@@ -301,7 +309,7 @@ export const updateFighter = (
     }
 
     // --- Trails ---
-    const isHighSpeed = Math.abs(f.vx) > 5 || f.isDashing || f.isAttacking || f.isGrappling;
+    const isHighSpeed = Math.abs(f.vx) > 5 || f.isDashing || f.isAttacking || f.isGrappling || f.isDiving;
     if (isHighSpeed && gameState.frameCount % (Math.ceil(2/timeScale)) === 0) {
         f.trail.push({
             x: f.x,
@@ -321,7 +329,7 @@ export const updateFighter = (
 
     // --- Action Logic ---
     
-    if (input.dash && f.dashCooldown <= 0) {
+    if (input.dash && f.dashCooldown <= 0 && !f.isDiving) {
       if (f.isGrappling) {
           f.isGrappling = false;
           f.grapplePoint = null;
@@ -336,6 +344,13 @@ export const updateFighter = (
       const dashDir = input.x !== 0 ? Math.sign(input.x) : f.facing;
       f.facing = dashDir as 1 | -1;
 
+      // KINETIC: ROCKET DASH
+      if (f.classType === 'KINETIC') {
+          gameState.shake += 5; // Engine roar shake
+          audio?.playDash();
+          // No teleport, purely physics boost handled below
+      }
+
       // VORTEX "QUANTUM BLINK" START
       if (f.classType === 'VORTEX') {
           f.scaleX = 0.1; // Implosion start
@@ -344,14 +359,13 @@ export const updateFighter = (
           f.vx = 0;
           f.vy = 0;
       } else {
-          audio?.playDash();
+          if (f.classType !== 'KINETIC') audio?.playDash();
           f.scaleX = 1.7; 
           f.scaleY = 0.4; 
-          gameState.shake += 2;
       }
     }
 
-    if (input.jump && (f.isGrounded || (f.classType === 'SLINGER' && f.isGrappling))) {
+    if (input.jump && (f.isGrounded || (f.classType === 'SLINGER' && f.isGrappling)) && !f.isDiving) {
        if (f.isGrappling) {
            f.isGrappling = false;
            f.grapplePoint = null;
@@ -370,7 +384,7 @@ export const updateFighter = (
        audio?.playJump();
     }
 
-    if (freshAttack && !f.isDashing) {
+    if (freshAttack && !f.isDashing && !f.isDiving) {
         if (f.isGrappling) {
              f.isGrappling = false;
              f.grapplePoint = null;
@@ -417,18 +431,13 @@ export const updateFighter = (
       if (f.classType === 'VORTEX') {
           f.vx = 0;
           f.vy = 0;
-          
-          // Logic: Disappear for 5 frames. Teleport around frame 4 (9 - 5).
           const teleportFrame = stats.dashDuration - 5;
           
-          // Trigger teleport exactly once when crossing the threshold
           if (f.dashTimer <= teleportFrame && f.dashTimer > teleportFrame - timeScale) {
                f.x += f.facing * 350;
-               // Clamp
                if (f.x < 0) f.x = 0;
                if (f.x + f.width > WORLD_WIDTH) f.x = WORLD_WIDTH - f.width;
                
-               // Explosion/Squash at arrival
                f.scaleX = 1.6;
                f.scaleY = 0.6;
                gameState.shake += 5;
@@ -436,13 +445,12 @@ export const updateFighter = (
                createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.primary);
           }
           
-          // While waiting to teleport (timer > teleportFrame), keep invisible/imploded
           if (f.dashTimer > teleportFrame) {
               f.scaleX = 0.1;
               f.scaleY = 0.1;
           }
       } else {
-          // Standard Dash
+          // Standard & Kinetic Dash
           f.vx = f.facing * stats.dashSpeed;
           f.vy = 0; 
       }
@@ -465,7 +473,8 @@ export const updateFighter = (
         }
     }
     else {
-        if (!f.isGrappling) {
+        // Normal Movement
+        if (!f.isGrappling && !f.isDiving) {
             const accel = f.isGrounded ? stats.speed : stats.speed * 0.8;
             f.vx += input.x * accel * timeScale; 
             if (Math.abs(f.vx) > stats.maxSpeed) f.vx = Math.sign(f.vx) * stats.maxSpeed;
@@ -473,7 +482,7 @@ export const updateFighter = (
         }
     }
 
-    if (!f.isDashing) {
+    if (!f.isDashing && !f.isDiving) {
         const gMult = f.isGrappling ? 0.05 : stats.gravityScale;
         f.vy += GRAVITY * gMult * timeScale;
     }
@@ -483,7 +492,7 @@ export const updateFighter = (
 
     if (f.y + f.height >= GROUND_Y) {
       f.y = GROUND_Y - f.height;
-      if (!f.isGrappling) {
+      if (!f.isGrappling && !f.isDiving) {
           f.vy = 0;
           f.isGrounded = true;
       } 
@@ -498,8 +507,9 @@ export const updateFighter = (
         }
         f.x = 0; 
         f.vx = 0; 
-        if (f.isGrappling) {
+        if (f.isGrappling || f.isDiving) {
             f.isGrappling = false;
+            f.isDiving = false;
             f.grapplePoint = null;
             f.grappleTargetId = null;
             f.grappleCooldownTimer = GRAPPLE_COOLDOWN; 
@@ -512,15 +522,16 @@ export const updateFighter = (
         }
         f.x = WORLD_WIDTH - f.width; 
         f.vx = 0; 
-        if (f.isGrappling) { 
+        if (f.isGrappling || f.isDiving) { 
             f.isGrappling = false;
+            f.isDiving = false;
             f.grapplePoint = null;
             f.grappleTargetId = null;
             f.grappleCooldownTimer = GRAPPLE_COOLDOWN; 
         }
     }
 
-    if (input.x !== 0 && !f.isDashing && !f.isAttacking && !f.isGrappling) {
+    if (input.x !== 0 && !f.isDashing && !f.isAttacking && !f.isGrappling && !f.isDiving) {
       f.facing = Math.sign(input.x) as 1 | -1;
     }
 
@@ -530,7 +541,6 @@ export const updateFighter = (
     if (Math.abs(f.vx) < 1.0) {
         f.rotation *= 0.7; 
     } else {
-        // REDUCED LEAN AMOUNT FOR STABILITY
         const leanAmount = f.isGrappling ? 0.4 : 0.25; 
         const targetRot = (f.vx / stats.maxSpeed) * leanAmount; 
         f.rotation += (targetRot - f.rotation) * 0.2 * timeScale;
