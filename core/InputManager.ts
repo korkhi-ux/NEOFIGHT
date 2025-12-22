@@ -51,8 +51,8 @@ export class InputManager {
   getPlayerInput() {
     return {
       x: (this.keys['KeyD'] ? 1 : 0) - (this.keys['KeyA'] ? 1 : 0),
-      jump: this.keys['KeyW'] || this.keys['KeyZ'] || this.keys['Space'],
-      dash: this.keys['ShiftLeft'], // Shift is usually better for dash if E/RightClick is special
+      jump: this.keys['KeyW'] || this.keys['KeyZ'],
+      dash: this.keys['Space'], // Shift is usually better for dash if E/RightClick is special
       attack: this.keys['MouseLeft'],
       special: this.keys['MouseRight'] || this.keys['KeyE']
     };
