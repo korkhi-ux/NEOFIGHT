@@ -1,6 +1,6 @@
 
 import React, { useRef } from 'react';
-import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../constants';
+import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../config/physics';
 import { useGameLoop } from '../hooks/useGameLoop';
 import { HUD } from './HUD';
 import { FighterClass } from '../types';

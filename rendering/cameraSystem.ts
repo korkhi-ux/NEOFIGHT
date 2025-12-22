@@ -1,5 +1,6 @@
 
-import { MIN_ZOOM, MAX_ZOOM, WORLD_WIDTH, GROUND_Y, MAX_SPEED, CAMERA_TILT_MAX } from '../constants';
+import { MAX_ZOOM, MIN_ZOOM, CAMERA_TILT_MAX } from '../config/settings';
+import { WORLD_WIDTH, GROUND_Y, MAX_SPEED } from '../config/physics';
 import { GameState } from '../types';
 
 const lerp = (start: number, end: number, t: number) => {

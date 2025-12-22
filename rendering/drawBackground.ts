@@ -1,5 +1,6 @@
 
-import { COLORS, WORLD_WIDTH, GROUND_Y } from '../constants';
+import { COLORS } from '../config/colors';
+import { WORLD_WIDTH, GROUND_Y } from '../config/physics';
 import { GameState } from '../types';
 
 export const drawBackground = (ctx: CanvasRenderingContext2D, gameState: GameState, viewW: number, camX: number) => {

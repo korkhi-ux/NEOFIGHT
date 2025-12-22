@@ -1,5 +1,5 @@
 
-import { ATTACK_RANGE, ATTACK_DURATIONS } from '../constants';
+import { ATTACK_RANGE, ATTACK_DURATIONS } from '../config/balance';
 import { Fighter, GameState } from '../types';
 
 export const updateAI = (enemy: Fighter, player: Fighter, gameState: GameState): { x: number, jump: boolean, dash: boolean, attack: boolean, special: boolean } => {

@@ -1,7 +1,9 @@
 
 import React, { useEffect, useRef } from 'react';
 import { GameState, Fighter, FighterClass } from '../types';
-import { COLORS, WORLD_WIDTH, GROUND_Y, PLAYER_HEIGHT, PLAYER_WIDTH, CLASS_STATS } from '../constants';
+import { COLORS } from '../config/colors';
+import { WORLD_WIDTH, GROUND_Y, PLAYER_HEIGHT, PLAYER_WIDTH } from '../config/physics';
+import { CLASS_STATS } from '../config/balance';
 import { InputManager } from '../core/InputManager';
 import { AudioManager } from '../core/AudioManager';
 import { updateFighter } from '../logic/fighterPhysics';

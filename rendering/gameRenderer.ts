@@ -1,6 +1,6 @@
 
 import { GameState } from '../types';
-import { COLORS } from '../constants';
+import { COLORS } from '../config/colors';
 import { drawBackground } from './drawBackground';
 import { drawFighter } from './drawFighter';
 import { drawEffects, drawSpeedLines, drawOscilloscope } from './drawEffects';

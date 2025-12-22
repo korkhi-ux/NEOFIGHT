@@ -1,5 +1,6 @@
 
-import { ATTACK_RANGE, ATTACK_DURATIONS, ATTACK_DAMAGES, ATTACK_KNOCKBACKS, HIT_FLASH_DURATION, CLASS_STATS } from '../constants';
+import { ATTACK_RANGE, ATTACK_DURATIONS, ATTACK_DAMAGES, ATTACK_KNOCKBACKS, CLASS_STATS } from '../config/balance';
+import { HIT_FLASH_DURATION } from '../config/settings';
 import { Fighter, GameState } from '../types';
 import { AudioManager } from '../core/AudioManager';
 import { createImpact, createParticles, createShockwave, createFlare } from './effectSpawners';

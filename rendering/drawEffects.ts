@@ -1,6 +1,6 @@
 
 import { GameState } from '../types';
-import { COLORS } from '../constants';
+import { COLORS } from '../config/colors';
 import { AudioManager } from '../core/AudioManager';
 
 export const drawEffects = (ctx: CanvasRenderingContext2D, gameState: GameState, width: number, height: number, audio: AudioManager | null) => {
