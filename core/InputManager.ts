@@ -52,9 +52,9 @@ export class InputManager {
     return {
       x: (this.keys['KeyD'] || this.keys['ArrowRight'] ? 1 : 0) - (this.keys['KeyA'] || this.keys['ArrowLeft'] ? 1 : 0),
       // Jump: W, Z, or Up Arrow (Removed Space)
-      jump: this.keys['KeyW'] || this.keys['KeyZ'] || this.keys['ArrowUp'],
+      jump: this.keys['KeyW'] || this.keys['KeyZ'] || this.keys['ArrowUp']|| this.keys['Space'],
       // Dash: Shift or Space
-      dash: this.keys['ShiftLeft'] || this.keys['Space'],
+      dash: this.keys['ShiftLeft'] ,
       attack: this.keys['MouseLeft'],
       special: this.keys['MouseRight'] || this.keys['KeyE']
     };

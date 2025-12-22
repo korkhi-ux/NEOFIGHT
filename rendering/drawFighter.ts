@@ -11,11 +11,11 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
         ctx.save();
         ctx.translate(f.x + f.width/2, f.y + f.height/2);
 
-        // 1. SPEED LINES (Velocity > 12)
-        if (speed > 12) {
-             ctx.globalAlpha = Math.min(0.6, (speed - 12) / 10);
+        // 1. SPEED LINES (Velocity > 8) - Lowered threshold for earlier feedback
+        if (speed > 8) {
+             ctx.globalAlpha = Math.min(0.6, (speed - 8) / 10);
              ctx.strokeStyle = '#ffffff';
-             ctx.lineWidth = 2;
+             ctx.lineWidth = 3; // Thicker lines
              
              // Draw lines opposite to movement
              const angle = Math.atan2(f.vy, f.vx);
@@ -235,7 +235,7 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
     const bodyW = f.width;
     const bodyH = f.height;
 
-    // Body Render (GLITCH vs NORMAL)
+    // Body Render (GLITCH vs KINETIC vs NORMAL)
     if (f.classType === 'VORTEX') {
         // --- GLITCH BODY ---
         ctx.fillStyle = f.color.primary;
@@ -252,6 +252,36 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
         ctx.lineWidth = 1;
         ctx.shadowBlur = 0;
         ctx.strokeRect((-bodyW/2), -bodyH, bodyW, bodyH);
+
+    } else if (f.classType === 'KINETIC') {
+        // --- KINETIC BODY (ENGINE BLOCK) ---
+        ctx.fillStyle = f.color.secondary; // Acier Sombre
+        ctx.beginPath();
+        ctx.roundRect(-bodyW/2, -bodyH, bodyW, bodyH, 4);
+        ctx.fill();
+        
+        // Frame (Orange)
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = f.color.primary;
+        ctx.stroke();
+
+        // Core Visualization (V8 Engine Feel)
+        const speedRatio = Math.min(Math.sqrt(f.vx*f.vx + f.vy*f.vy) / 20, 1);
+        
+        ctx.fillStyle = f.color.glow;
+        ctx.globalAlpha = 0.5 + (0.5 * speedRatio);
+        ctx.shadowBlur = 10 + (20 * speedRatio);
+        ctx.shadowColor = f.color.primary;
+        
+        // V shape
+        ctx.beginPath();
+        ctx.moveTo(-bodyW/4, -bodyH * 0.7);
+        ctx.lineTo(0, -bodyH * 0.4);
+        ctx.lineTo(bodyW/4, -bodyH * 0.7);
+        ctx.fill();
+        
+        ctx.globalAlpha = 1.0;
+        ctx.shadowBlur = 0;
 
     } else {
         // --- STANDARD BODY ---

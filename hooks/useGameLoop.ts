@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import { GameState, Fighter, FighterClass } from '../types';
 import { COLORS, WORLD_WIDTH, GROUND_Y, PLAYER_HEIGHT, PLAYER_WIDTH, CLASS_STATS } from '../constants';
@@ -13,10 +14,16 @@ const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClas
   const stats = CLASS_STATS[classType];
   
   // Determine color based on class and ID
-  let colorSet = id === 'enemy' ? COLORS.enemy : COLORS.player;
-  if (id === 'player') {
-      if (classType === 'SLINGER') colorSet = COLORS.slinger;
-      if (classType === 'VORTEX') colorSet = COLORS.vortex;
+  let colorSet = COLORS.player; // Default fallback
+
+  if (id === 'enemy') {
+      colorSet = COLORS.enemy;
+  } else {
+      // Dynamic color assignment based on class
+      if (classType === 'KINETIC') colorSet = COLORS.kinetic;
+      else if (classType === 'VORTEX') colorSet = COLORS.vortex;
+      else if (classType === 'SLINGER') colorSet = COLORS.slinger;
+      else colorSet = COLORS.player; // STANDARD
   }
   
   return {
@@ -49,6 +56,10 @@ const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClas
         vy: 0,
         life: 0
     } : undefined,
+    
+    // KINETIC
+    isDiving: false,
+    dynamicDamageMult: 1.0,
     
     aiState: id === 'enemy' ? {
         mode: 'neutral', 
@@ -86,7 +97,7 @@ export const useGameLoop = (
     canvasRef: React.RefObject<HTMLCanvasElement>,
     gameActive: boolean,
     onGameOver: (winner: 'player' | 'enemy', pScore: number, eScore: number) => void,
-    playerClass: FighterClass = 'STANDARD'
+    playerClass: FighterClass = 'KINETIC' // Defaulted to KINETIC for testing
 ) => {
     const inputManager = useRef(new InputManager());
     const audioManager = useRef<AudioManager | null>(null);
