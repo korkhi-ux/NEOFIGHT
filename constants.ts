@@ -65,16 +65,16 @@ export const CLASS_STATS: Record<FighterClass, ClassStats> = {
         damageMult: 0.9,
         gravityScale: 0.6 // Very floaty
     },
-    HEAVY: { // Slow, tanky, huge damage
-        speed: PLAYER_SPEED * 0.8,
-        maxSpeed: MAX_SPEED * 0.8,
-        jumpForce: JUMP_FORCE * 0.8,
-        dashSpeed: DASH_SPEED * 0.9,
-        dashDuration: DASH_DURATION * 1.2,
-        dashCooldown: DASH_COOLDOWN * 1.5,
-        health: 140,
-        damageMult: 1.4,
-        gravityScale: 1.2
+    KINETIC: { // THERMAL TANK (Replaces HEAVY)
+        speed: 3.0, // Slow
+        maxSpeed: 14, // Cap low
+        jumpForce: JUMP_FORCE * 0.9, // Heavy jump
+        dashSpeed: 45, // EXPLOSIVE short dash
+        dashDuration: 6, // Very short dash
+        dashCooldown: 30,
+        health: 140, // Tanky
+        damageMult: 1.5, // Huge damage
+        gravityScale: 1.3 // Falls like a rock
     }
 };
 
@@ -128,6 +128,11 @@ export const COLORS = {
     primary: '#8b5cf6', // Violet Neon
     secondary: '#6d28d9', // Deep Purple
     glow: '#d946ef',      // Electric Magenta
+  },
+  kinetic: {
+    primary: '#f97316', // Orange Brûlé
+    secondary: '#ea580c', // Rouille
+    glow: '#ffedd5',      // Blanc Chaud incandescent
   },
   enemy: {
     primary: '#4f46e5', // Electric Indigo

@@ -12,6 +12,7 @@ export const checkCollisions = (
     const { player, enemy } = gameState;
 
     const checkHit = (attacker: Fighter, defender: Fighter) => {
+      // 1. STANDARD ATTACKS
       if (attacker.isAttacking) {
         const frameToHit = Math.floor(ATTACK_DURATIONS[attacker.comboCount] / 2);
         
@@ -37,6 +38,33 @@ export const checkCollisions = (
             }
         }
       }
+
+      // 2. KINETIC DASH RAM (Collision Logic)
+      if (attacker.classType === 'KINETIC' && attacker.isDashing) {
+          if (
+              attacker.x < defender.x + defender.width &&
+              attacker.x + attacker.width > defender.x &&
+              attacker.y < defender.y + defender.height &&
+              attacker.y + attacker.height > defender.y
+          ) {
+              // Only hit if we haven't hit recently (using dashTimer as a throttle is tricky, better use hitFlash)
+              if (defender.hitFlashTimer <= 0) {
+                  // Minor Impact
+                  defender.health -= 5;
+                  defender.hitFlashTimer = 5;
+                  defender.vx = attacker.facing * 10;
+                  defender.vy = -5;
+                  
+                  // Stop the Kinetic
+                  attacker.vx = 0;
+                  attacker.dashTimer = 0; // End dash
+                  
+                  createImpact(gameState, defender.x + defender.width/2, defender.y + defender.height/2, attacker.color.glow);
+                  audio?.playHit(false);
+                  gameState.shake += 5;
+              }
+          }
+      }
     };
 
     checkHit(player, enemy);
@@ -50,7 +78,11 @@ const handleHit = (
     audio: AudioManager | null, 
     onGameOver: (winner: 'player' | 'enemy', pScore: number, eScore: number) => void
 ) => {
-    if (defender.isDashing) return; 
+    // STANDARD DASH INVULNERABILITY (Except Kinetic Ram handled above)
+    if (defender.isDashing && defender.classType !== 'KINETIC') return; 
+
+    // KINETIC SUPER ARMOR DURING DASH
+    const isKineticArmor = defender.classType === 'KINETIC' && defender.isDashing;
 
     const impactX = defender.x + defender.width/2;
     const impactY = defender.y + defender.height/2;
@@ -76,15 +108,32 @@ const handleHit = (
     }
 
     // Physics
-    const damage = ATTACK_DAMAGES[attacker.comboCount];
+    let damage = ATTACK_DAMAGES[attacker.comboCount];
+    
+    // Kinetic Overheat Damage Bonus
+    if (attacker.classType === 'KINETIC' && attacker.heat && attacker.heat > 80) {
+        damage *= 1.5;
+    }
+
     const knockback = ATTACK_KNOCKBACKS[attacker.comboCount];
 
     defender.health -= damage;
-    defender.vx = attacker.facing * knockback;
-    defender.vy = -5;
     
-    defender.scaleX = 0.5;
-    defender.scaleY = 1.5;
+    // Kinetic Passive: Heat on Damage Taken
+    if (defender.classType === 'KINETIC' && defender.heat !== undefined) {
+        defender.heat += damage * 2;
+        defender.heat = Math.min(100, defender.heat);
+    }
+
+    if (!isKineticArmor) {
+        defender.vx = attacker.facing * knockback;
+        defender.vy = -5;
+        defender.scaleX = 0.5;
+        defender.scaleY = 1.5;
+    } else {
+        // Armor Visual Feedback
+        createParticles(gameState, defender.x + defender.width/2, defender.y, 5, '#ffffff', 5);
+    }
 
     createParticles(gameState, impactX, impactY, 15, '#fff', 12);
     createParticles(gameState, impactX, impactY, 10, attacker.color.glow, 15);

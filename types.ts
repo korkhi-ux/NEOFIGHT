@@ -73,7 +73,7 @@ export interface AIState {
 }
 
 // --- CLASS SYSTEM TYPES ---
-export type FighterClass = 'STANDARD' | 'SLINGER' | 'VORTEX' | 'HEAVY';
+export type FighterClass = 'STANDARD' | 'SLINGER' | 'VORTEX' | 'KINETIC';
 
 export interface VoidOrb {
   x: number;
@@ -119,6 +119,9 @@ export interface Fighter {
 
   // VORTEX Mechanics
   voidOrb?: VoidOrb;
+
+  // KINETIC Mechanics
+  heat?: number; // 0 to 100
 
   // Previous Frame State (for friction/landing particles)
   prevVx: number;

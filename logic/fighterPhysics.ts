@@ -5,7 +5,7 @@ import {
   CLASS_STATS, GRAPPLE_COOLDOWN, GRAPPLE_MAX_SPEED, GRAPPLE_RANGE
 } from '../constants';
 import { Fighter, GameState } from '../types';
-import { createParticles, createShockwave } from './effectSpawners';
+import { createParticles, createShockwave, createImpact, createFlare } from './effectSpawners';
 import { AudioManager } from '../core/AudioManager';
 
 interface FighterInput {
@@ -40,15 +40,53 @@ export const updateFighter = (
     f.prevVx = f.vx;
     f.prevGrounded = f.isGrounded;
 
+    // --- KINETIC: THERMAL CORE PASSIVE ---
+    if (f.classType === 'KINETIC' && f.heat !== undefined) {
+        // 1. Gain Heat from Movement
+        if (f.isGrounded && Math.abs(f.vx) > 1) {
+            f.heat += Math.abs(f.vx) * 0.1 * timeScale;
+        }
+        // 2. Gain Heat from Braking (Friction)
+        if (f.isGrounded && justChangedDir) {
+            f.heat += 5;
+            createParticles(gameState, f.x + f.width/2, f.y + f.height, 3, f.color.secondary, 2);
+        }
+
+        f.heat = Math.min(100, f.heat);
+
+        // 3. Overheat Logic
+        if (f.heat > 80) {
+             // Self Burn: 1 Damage per second (approx every 60 frames)
+             if (gameState.frameCount % 60 === 0) {
+                 f.health -= 1;
+                 createParticles(gameState, f.x + f.width/2, f.y + f.height/2, 3, '#ff0000', 5);
+             }
+             // Smoke/Steam visual
+             if (Math.random() < 0.2) {
+                 createParticles(gameState, f.x + Math.random()*f.width, f.y + Math.random()*f.height, 1, '#ffffff', 2);
+             }
+        }
+    }
+
     // --- Effects: Friction & Landing ---
     if (f.isGrounded && justChangedDir) {
         createParticles(gameState, f.x + f.width/2, f.y + f.height, 5, f.color.glow, 4);
     }
     
     if (justLanded) {
-        createParticles(gameState, f.x + f.width/2, f.y + f.height, 8, '#ffffff', 3);
-        f.scaleX = 1.5; 
-        f.scaleY = 0.5; 
+        // KINETIC: Heavy Landing
+        if (f.classType === 'KINETIC') {
+            createParticles(gameState, f.x + f.width/2, f.y + f.height, 15, f.color.glow, 5);
+            createShockwave(gameState, f.x + f.width/2, f.y + f.height, f.color.secondary);
+            f.scaleX = 1.6; // Massive Squash
+            f.scaleY = 0.4;
+            gameState.shake += 5; // Ground Shake
+            audio?.playHit(true); // Thud sound
+        } else {
+            createParticles(gameState, f.x + f.width/2, f.y + f.height, 8, '#ffffff', 3);
+            f.scaleX = 1.5; 
+            f.scaleY = 0.5; 
+        }
     }
 
     // --- Timers ---
@@ -60,6 +98,48 @@ export const updateFighter = (
 
     if (f.comboTimer <= 0 && !f.isAttacking) {
         f.comboCount = 0;
+    }
+
+    // --- KINETIC SPECIAL: SEISMIC DISCHARGE ---
+    if (f.classType === 'KINETIC' && freshSpecial && f.heat !== undefined) {
+        // Calculate power based on heat
+        const chargeLevel = f.heat / 100;
+        const radius = 100 + (chargeLevel * 300); // 100 to 400px
+        const damage = 10 + (chargeLevel * 30); // 10 to 40 dmg
+        const knockback = 10 + (chargeLevel * 30);
+        
+        // VISUALS
+        createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.glow);
+        createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.primary);
+        createParticles(gameState, f.x + f.width/2, f.y + f.height/2, 20, f.color.glow, 15 * chargeLevel);
+        gameState.shake += 10 + (20 * chargeLevel);
+        createFlare(gameState, f.x + f.width/2, f.y + f.height/2, f.color.primary);
+
+        // AOE HIT DETECTION
+        const distOpp = Math.sqrt(Math.pow((opponent.x + opponent.width/2) - (f.x + f.width/2), 2) + Math.pow((opponent.y + opponent.height/2) - (f.y + f.height/2), 2));
+        
+        if (distOpp < radius) {
+            if (!opponent.isDashing) { // Can dodge with dash
+                opponent.health -= damage;
+                opponent.hitFlashTimer = 5;
+                opponent.vx = Math.sign(opponent.x - f.x) * knockback;
+                opponent.vy = -10; // Launch up
+                opponent.isStunned = true;
+                audio?.playHit(true);
+            }
+        }
+
+        // SELF RECOIL (Ground Slam if aerial)
+        if (!f.isGrounded) {
+             f.vy = 30; // Slam down
+        } else {
+             f.vy = -5; // Hop
+        }
+
+        // Reset Heat
+        f.heat = 0;
+        f.grappleCooldownTimer = 60; // Short CD for special reuse
+        audio?.playKO(); // Explosion sound
     }
 
     // --- VORTEX SPECIAL: VOID ORB ---

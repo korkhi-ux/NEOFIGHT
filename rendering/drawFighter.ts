@@ -175,13 +175,12 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
     const bodyW = f.width;
     const bodyH = f.height;
 
-    // Body Render (GLITCH vs NORMAL)
+    // Body Render
     if (f.classType === 'VORTEX') {
-        // --- GLITCH BODY ---
+        // --- GLITCH BODY (VORTEX) ---
         ctx.fillStyle = f.color.primary;
         ctx.strokeStyle = f.color.glow;
         
-        // Exactement 3 ou 4 slices comme demandé pour l'instabilité
         const slices = 4;
         const sliceH = bodyH / slices;
         
@@ -193,6 +192,43 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
         ctx.lineWidth = 1;
         ctx.shadowBlur = 0;
         ctx.strokeRect((-bodyW/2), -bodyH, bodyW, bodyH);
+
+    } else if (f.classType === 'KINETIC') {
+        // --- BULKY BODY (KINETIC) ---
+        const bulkW = bodyW * 1.3;
+        const bulkH = bodyH * 0.9;
+        
+        ctx.fillStyle = f.color.primary;
+        ctx.beginPath();
+        // Trapezoid shape for bulkiness
+        ctx.moveTo(-bulkW/2 + 5, -bulkH);
+        ctx.lineTo(bulkW/2 - 5, -bulkH);
+        ctx.lineTo(bulkW/2, 0);
+        ctx.lineTo(-bulkW/2, 0);
+        ctx.closePath();
+        ctx.fill();
+        
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = f.color.secondary;
+        ctx.stroke();
+
+        // THERMAL CORE
+        if (f.heat !== undefined) {
+             const heatRatio = f.heat / 100;
+             let coreColor = '#fbbf24'; // Yellow (low)
+             if (heatRatio > 0.5) coreColor = '#ef4444'; // Red (med)
+             if (heatRatio > 0.8) coreColor = '#ffffff'; // White hot (high)
+
+             ctx.fillStyle = coreColor;
+             ctx.shadowColor = coreColor;
+             ctx.shadowBlur = 10 + (20 * heatRatio);
+             
+             const pulse = Math.sin(gameState.frameCount * 0.5) * (5 * heatRatio);
+             
+             ctx.beginPath();
+             ctx.arc(0, -bulkH * 0.6, 12 + pulse, 0, Math.PI * 2);
+             ctx.fill();
+        }
 
     } else {
         // --- STANDARD BODY ---
@@ -212,7 +248,9 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
         ctx.shadowBlur = 5;
         ctx.shadowColor = '#fff';
         const eyeOffset = f.facing === 1 ? bodyW/4 : -bodyW/4 - 10;
-        ctx.fillRect(eyeOffset, -bodyH + 20, 15, 4);
+        // Adjust eyes for Kinetic
+        const eyeY = f.classType === 'KINETIC' ? -bodyH * 0.8 + 20 : -bodyH + 20;
+        ctx.fillRect(eyeOffset, eyeY, 15, 4);
     }
 
     // --- ANIME NEEDLE BLADES (Attacks) ---

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { GameCanvas } from './components/GameCanvas';
-import { Play, RotateCcw, Keyboard, Sword, Shield, Zap, Wind, Anchor } from 'lucide-react';
+import { Play, RotateCcw, Keyboard, Sword, Shield, Zap, Wind, Anchor, Flame } from 'lucide-react';
 import { FighterClass } from './types';
 
 export default function App() {
@@ -160,10 +160,10 @@ export default function App() {
                    <span className="text-xs font-bold text-white tracking-widest">VORTEX</span>
                    <span className="text-[9px] text-white/50 mt-1">FLOATY / TECH</span>
                </button>
-               <button onClick={() => setSelectedClass('HEAVY')} className={`class-btn flex flex-col items-center p-4 w-32 ${selectedClass === 'HEAVY' ? 'active' : ''}`}>
-                   <Shield className="w-8 h-8 text-red-400 mb-2"/>
-                   <span className="text-xs font-bold text-white tracking-widest">HEAVY</span>
-                   <span className="text-[9px] text-white/50 mt-1">TANK / SLOW</span>
+               <button onClick={() => setSelectedClass('KINETIC')} className={`class-btn flex flex-col items-center p-4 w-32 ${selectedClass === 'KINETIC' ? 'active' : ''}`}>
+                   <Flame className="w-8 h-8 text-orange-400 mb-2"/>
+                   <span className="text-xs font-bold text-white tracking-widest">KINETIC</span>
+                   <span className="text-[9px] text-white/50 mt-1">THERMAL TANK</span>
                </button>
           </div>
           
