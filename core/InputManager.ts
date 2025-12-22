@@ -51,10 +51,10 @@ export class InputManager {
   getPlayerInput() {
     return {
       x: (this.keys['KeyD'] || this.keys['ArrowRight'] ? 1 : 0) - (this.keys['KeyA'] || this.keys['ArrowLeft'] ? 1 : 0),
-      // Jump: W, Z, or Up Arrow (Removed Space)
-      jump: this.keys['KeyW'] || this.keys['KeyZ'] || this.keys['ArrowUp']|| this.keys['Space'],
-      // Dash: Shift or Space
-      dash: this.keys['ShiftLeft'] ,
+      // Jump: W, Z, or Up Arrow (Explicitly removed Space)
+      jump: this.keys['KeyW'] || this.keys['KeyZ'] || this.keys['ArrowUp'],
+      // Dash: Space or Shift
+      dash: this.keys['Space'] || this.keys['ShiftLeft'],
       attack: this.keys['MouseLeft'],
       special: this.keys['MouseRight'] || this.keys['KeyE']
     };

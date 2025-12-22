@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import { GameState, Fighter, FighterClass } from '../types';
 import { COLORS } from '../config/colors';
@@ -15,21 +14,15 @@ import { renderGame } from '../rendering/gameRenderer';
 const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClass = 'VOLT'): Fighter => {
   const stats = CLASS_STATS[classType];
   
-  // Determine color based on class and ID
-  let colorSet = COLORS.player; // Default fallback
-
-  if (id === 'enemy') {
-      colorSet = COLORS.enemy;
-  } else {
-      // Dynamic color assignment based on class string
-      const classKey = classType.toLowerCase() as keyof typeof COLORS;
-      const theme = COLORS[classKey];
-      
-      // Ensure we have a valid color object (filters out string values in COLORS)
-      if (theme && typeof theme === 'object') {
-          colorSet = theme;
-      }
-  }
+  // Dynamic color assignment based on class string
+  const classKey = classType.toLowerCase() as keyof typeof COLORS;
+  const retrievedColor = COLORS[classKey];
+  
+  // If player, use the class color. If enemy, use the enemy color theme.
+  // We check typeof object to distinguish between color themes and string config values in COLORS
+  const colorSet = (id === 'player' && typeof retrievedColor === 'object') 
+    ? retrievedColor 
+    : (id === 'player' ? COLORS.player : COLORS.enemy);
   
   return {
     id,

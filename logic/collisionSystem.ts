@@ -89,14 +89,16 @@ const handleHit = (
     let baseDamage = ATTACK_DAMAGES[attacker.comboCount];
     
     // Apply Class Multiplier OR Dynamic Velocity Multiplier
-    // If Kinetic, dynamicDamageMult is active (0.8x to ~2.5x).
-    // If others, use static class multiplier (e.g. 1.0).
-    const multiplier = attacker.dynamicDamageMult ?? CLASS_STATS[attacker.classType].damageMult;
-    
-    const finalDamage = baseDamage * multiplier;
+    const multiplier = CLASS_STATS[attacker.classType].damageMult;
+    let finalDamage = baseDamage * multiplier;
+
+    // KINETIC VELOCITY BONUS
+    if (attacker.classType === 'KINETIC' && attacker.dynamicDamageMult) {
+        finalDamage = baseDamage * attacker.dynamicDamageMult;
+    }
 
     // --- HIGH VELOCITY FEEDBACK ---
-    const isHeavyHit = attacker.comboCount === 2 || multiplier > 1.5;
+    const isHeavyHit = attacker.comboCount === 2 || (attacker.dynamicDamageMult && attacker.dynamicDamageMult > 1.5);
 
     if (isHeavyHit) {
         gameState.chromaticAberration = 8;

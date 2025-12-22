@@ -5,7 +5,7 @@ import {
 } from '../config/physics';
 import { ATTACK_DURATIONS, ATTACK_COOLDOWN, COMBO_WINDOW, CLASS_STATS } from '../config/balance';
 import { Fighter, GameState } from '../types';
-import { createParticles, createShockwave } from './effectSpawners';
+import { createParticles } from './effectSpawners';
 import { AudioManager } from '../core/AudioManager';
 
 // Import Class Logic
@@ -46,7 +46,8 @@ export const updateFighter = (
     f.prevVx = f.vx;
     f.prevGrounded = f.isGrounded;
 
-    // --- DELEGATE CLASS SPECIFIC LOGIC ---
+    // --- 1. DISPATCH CLASS SPECIFIC LOGIC ---
+    // This handles special abilities, unique states, and passive mechanics
     switch(f.classType) {
         case 'VOLT':
             updateVolt(f, gameState, freshSpecial, opponent, audio);
@@ -62,27 +63,10 @@ export const updateFighter = (
             break;
     }
     
-    // --- Trails ---
-    const isHighSpeed = Math.abs(f.vx) > 5 || f.isDashing || f.isAttacking || f.isGrappling || f.isDiving;
-    if (isHighSpeed && gameState.frameCount % (Math.ceil(2/timeScale)) === 0) {
-        f.trail.push({
-            x: f.x,
-            y: f.y,
-            scaleX: f.scaleX,
-            scaleY: f.scaleY,
-            rotation: f.rotation,
-            facing: f.facing,
-            alpha: 0.3, 
-            color: f.color.glow
-        });
-    }
-    for (let i = f.trail.length - 1; i >= 0; i--) {
-        f.trail[i].alpha -= 0.1 * timeScale;
-        if (f.trail[i].alpha <= 0) f.trail.splice(i, 1);
-    }
-
-    // --- Action Logic ---
+    // --- 2. COMMON ACTION LOGIC (Dash, Jump, Attack) ---
+    // Only process if specific class logic hasn't "consumed" the state (e.g., Kinetic diving)
     
+    // DASH
     if (input.dash && f.dashCooldown <= 0 && !f.isDiving) {
       if (f.isGrappling) {
           f.isGrappling = false;
@@ -113,6 +97,7 @@ export const updateFighter = (
       }
     }
 
+    // JUMP
     if (input.jump && (f.isGrounded || (f.classType === 'SLINGER' && f.isGrappling)) && !f.isDiving) {
        if (f.isGrappling) {
            f.isGrappling = false;
@@ -132,6 +117,7 @@ export const updateFighter = (
        audio?.playJump();
     }
 
+    // ATTACK
     if (freshAttack && !f.isDashing && !f.isDiving) {
         if (f.isGrappling) {
              f.isGrappling = false;
@@ -172,10 +158,13 @@ export const updateFighter = (
         }
     }
     
+    // --- 3. PHYSICS UPDATE ---
+    
     if (f.isDashing) {
       f.dashTimer -= timeScale;
       
       if (f.classType === 'VORTEX') {
+          // Teleport Dash Logic
           f.vx = 0; f.vy = 0;
           const teleportFrame = stats.dashDuration - 5;
           if (f.dashTimer <= teleportFrame && f.dashTimer > teleportFrame - timeScale) {
@@ -185,7 +174,6 @@ export const updateFighter = (
                f.scaleX = 1.6; f.scaleY = 0.6;
                gameState.shake += 5;
                audio?.playGlitch();
-               createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.primary);
           }
           if (f.dashTimer > teleportFrame) {
               f.scaleX = 0.1; f.scaleY = 0.1;
@@ -222,14 +210,17 @@ export const updateFighter = (
         }
     }
 
+    // Gravity
     if (!f.isDashing && !f.isDiving) {
         const gMult = f.isGrappling ? 0.05 : stats.gravityScale;
         f.vy += GRAVITY * gMult * timeScale;
     }
 
+    // Apply Velocity
     f.x += f.vx * timeScale;
     f.y += f.vy * timeScale;
 
+    // Ground Collision
     if (f.y + f.height >= GROUND_Y) {
       f.y = GROUND_Y - f.height;
       if (!f.isGrappling && !f.isDiving) {
@@ -240,6 +231,7 @@ export const updateFighter = (
         f.isGrounded = false;
     }
 
+    // Wall Constraints
     if (f.x < 0) { 
         if (f.vx < -5) {
             createParticles(gameState, 0, f.y + f.height/2, 5, '#ffffff', 5);
@@ -261,13 +253,16 @@ export const updateFighter = (
         }
     }
 
+    // Facing direction
     if (input.x !== 0 && !f.isDashing && !f.isAttacking && !f.isGrappling && !f.isDiving) {
       f.facing = Math.sign(input.x) as 1 | -1;
     }
 
+    // Visual Scales
     f.scaleX += (1 - f.scaleX) * 0.15 * timeScale;
     f.scaleY += (1 - f.scaleY) * 0.15 * timeScale;
 
+    // Rotation Tilt
     if (Math.abs(f.vx) < 1.0) {
         f.rotation *= 0.7; 
     } else {
@@ -275,7 +270,49 @@ export const updateFighter = (
         const targetRot = (f.vx / stats.maxSpeed) * leanAmount; 
         f.rotation += (targetRot - f.rotation) * 0.2 * timeScale;
     }
+
+    // Trails
+    const isHighSpeed = Math.abs(f.vx) > 5 || f.isDashing || f.isAttacking || f.isGrappling || f.isDiving;
+    if (isHighSpeed && gameState.frameCount % (Math.ceil(2/timeScale)) === 0) {
+        f.trail.push({
+            x: f.x,
+            y: f.y,
+            scaleX: f.scaleX,
+            scaleY: f.scaleY,
+            rotation: f.rotation,
+            facing: f.facing,
+            alpha: 0.3, 
+            color: f.color.glow
+        });
+    }
+    for (let i = f.trail.length - 1; i >= 0; i--) {
+        f.trail[i].alpha -= 0.1 * timeScale;
+        if (f.trail[i].alpha <= 0) f.trail.splice(i, 1);
+    }
     
+    // Timer Cleanup
+    if (f.dashCooldown > 0) f.dashCooldown -= timeScale;
+    if (f.attackCooldown > 0) f.attackCooldown -= timeScale;
+    if (f.comboTimer > 0) f.comboTimer -= timeScale;
+    if (f.hitFlashTimer > 0) f.hitFlashTimer -= timeScale;
+    if (f.comboTimer <= 0 && !f.isAttacking) {
+        f.comboCount = 0;
+    }
+
+    // Effects
+    if (f.isGrounded && justChangedDir) {
+        createParticles(gameState, f.x + f.width/2, f.y + f.height, 5, f.color.glow, 4);
+    }
+    
+    if (justLanded) {
+        if (f.classType === 'KINETIC' && f.vy > 20) {
+             gameState.shake += 2;
+        }
+        createParticles(gameState, f.x + f.width/2, f.y + f.height, 8, '#ffffff', 3);
+        f.scaleX = 1.5; 
+        f.scaleY = 0.5; 
+    }
+
     prevAttackInput[f.id] = input.attack;
     prevAttackInput[f.id + '_special'] = input.special;
 };
