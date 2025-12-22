@@ -1,5 +1,4 @@
-
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { GameState, Fighter, FighterClass } from '../types';
 import { COLORS, WORLD_WIDTH, GROUND_Y, PLAYER_HEIGHT, PLAYER_WIDTH, CLASS_STATS } from '../constants';
 import { InputManager } from '../core/InputManager';
@@ -83,9 +82,9 @@ export const useGameLoop = (
     const prevAttackInput = useRef<{ [key: string]: boolean }>({});
     
     const gameState = useRef<GameState>({
-        // START POSITIONS: Center of map +/- 300px (Closer start)
-        player: createFighter('player', WORLD_WIDTH / 2 - 300, playerClass),
-        enemy: createFighter('enemy', WORLD_WIDTH / 2 + 300, 'STANDARD'), 
+        // START POSITIONS: Center of map +/- 200px (Closer start)
+        player: createFighter('player', WORLD_WIDTH / 2 - 200, playerClass),
+        enemy: createFighter('enemy', WORLD_WIDTH / 2 + 200, 'STANDARD'), 
         particles: [],
         shockwaves: [],
         impacts: [],
@@ -120,8 +119,8 @@ export const useGameLoop = (
         // Reset State with Selected Class
         gameState.current = {
             ...gameState.current,
-            player: { ...createFighter('player', WORLD_WIDTH / 2 - 300, playerClass), score: currentPScore },
-            enemy: { ...createFighter('enemy', WORLD_WIDTH / 2 + 300, 'STANDARD'), score: currentEScore },
+            player: { ...createFighter('player', WORLD_WIDTH / 2 - 200, playerClass), score: currentPScore },
+            enemy: { ...createFighter('enemy', WORLD_WIDTH / 2 + 200, 'STANDARD'), score: currentEScore },
             gameActive: true,
             winner: null,
             slowMoFactor: 1.0,
