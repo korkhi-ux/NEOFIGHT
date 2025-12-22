@@ -181,11 +181,12 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
         ctx.fillStyle = f.color.primary;
         ctx.strokeStyle = f.color.glow;
         
-        const slices = 5;
+        // Exactement 3 ou 4 slices comme demandé pour l'instabilité
+        const slices = 4;
         const sliceH = bodyH / slices;
         
         for(let i=0; i<slices; i++) {
-            const offset = (Math.random() - 0.5) * 8; // Random X shift
+            const offset = (Math.random() - 0.5) * 6; // Décalage aléatoire
             ctx.fillRect((-bodyW/2) + offset, -bodyH + (i*sliceH), bodyW, sliceH - 2);
         }
         

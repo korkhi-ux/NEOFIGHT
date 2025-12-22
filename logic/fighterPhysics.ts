@@ -260,10 +260,9 @@ export const updateFighter = (
 
       // VORTEX "QUANTUM BLINK" START
       if (f.classType === 'VORTEX') {
-          f.scaleX = 0.1; // Implosion
+          f.scaleX = 0.1; // Implosion start
           f.scaleY = 0.1;
           audio?.playGlitch();
-          // Dont apply velocity, we teleport later
           f.vx = 0;
           f.vy = 0;
       } else {
@@ -338,22 +337,32 @@ export const updateFighter = (
       
       // VORTEX "QUANTUM BLINK" EXECUTION
       if (f.classType === 'VORTEX') {
-          // Mid-dash teleport
-          if (Math.abs(f.dashTimer - (stats.dashDuration / 2)) < timeScale) {
-              f.x += f.facing * 350;
-              // Clamp
-              if (f.x < 0) f.x = 0;
-              if (f.x + f.width > WORLD_WIDTH) f.x = WORLD_WIDTH - f.width;
-              
-              // Explosion
-              f.scaleX = 1.6;
-              f.scaleY = 0.6;
-              gameState.shake += 5;
-              audio?.playGlitch();
-              createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.primary);
-          }
-          f.vx = 0; // Freeze in place/invisible during dash
+          f.vx = 0;
           f.vy = 0;
+          
+          // Logic: Disappear for 5 frames. Teleport around frame 4 (9 - 5).
+          const teleportFrame = stats.dashDuration - 5;
+          
+          // Trigger teleport exactly once when crossing the threshold
+          if (f.dashTimer <= teleportFrame && f.dashTimer > teleportFrame - timeScale) {
+               f.x += f.facing * 350;
+               // Clamp
+               if (f.x < 0) f.x = 0;
+               if (f.x + f.width > WORLD_WIDTH) f.x = WORLD_WIDTH - f.width;
+               
+               // Explosion/Squash at arrival
+               f.scaleX = 1.6;
+               f.scaleY = 0.6;
+               gameState.shake += 5;
+               audio?.playGlitch();
+               createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.primary);
+          }
+          
+          // While waiting to teleport (timer > teleportFrame), keep invisible/imploded
+          if (f.dashTimer > teleportFrame) {
+              f.scaleX = 0.1;
+              f.scaleY = 0.1;
+          }
       } else {
           // Standard Dash
           f.vx = f.facing * stats.dashSpeed;

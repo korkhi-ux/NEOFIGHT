@@ -75,6 +75,15 @@ export interface AIState {
 // --- CLASS SYSTEM TYPES ---
 export type FighterClass = 'STANDARD' | 'SLINGER' | 'VORTEX' | 'HEAVY';
 
+export interface VoidOrb {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  active: boolean;
+  life: number;
+}
+
 export interface Fighter {
   id: 'player' | 'enemy';
   classType: FighterClass; // New: Class definition
@@ -109,14 +118,7 @@ export interface Fighter {
   grappleCooldownTimer: number; 
 
   // VORTEX Mechanics
-  voidOrb?: {
-      active: boolean;
-      x: number;
-      y: number;
-      vx: number;
-      vy: number;
-      life: number;
-  };
+  voidOrb?: VoidOrb;
 
   // Previous Frame State (for friction/landing particles)
   prevVx: number;
