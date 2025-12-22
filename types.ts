@@ -108,6 +108,16 @@ export interface Fighter {
   grappleTargetId?: string | null; // ID of the entity we are hooked to
   grappleCooldownTimer: number; 
 
+  // VORTEX Mechanics
+  voidOrb?: {
+      active: boolean;
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      life: number;
+  };
+
   // Previous Frame State (for friction/landing particles)
   prevVx: number;
   prevGrounded: boolean;

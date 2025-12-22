@@ -57,13 +57,13 @@ export const CLASS_STATS: Record<FighterClass, ClassStats> = {
     VORTEX: { // Floaty, tech-based
         speed: PLAYER_SPEED * 1.0,
         maxSpeed: MAX_SPEED * 1.1,
-        jumpForce: JUMP_FORCE * 1.2, // Higher jump
-        dashSpeed: DASH_SPEED * 1.2, // Teleport-like dash
-        dashDuration: DASH_DURATION * 0.6,
-        dashCooldown: DASH_COOLDOWN * 1.2,
+        jumpForce: JUMP_FORCE * 1.1, 
+        dashSpeed: 0, // Teleport logic overrides speed
+        dashDuration: DASH_DURATION,
+        dashCooldown: 40, // Longer cooldown for teleport
         health: 90,
         damageMult: 0.9,
-        gravityScale: 0.7
+        gravityScale: 0.6 // Very floaty
     },
     HEAVY: { // Slow, tanky, huge damage
         speed: PLAYER_SPEED * 0.8,
@@ -123,6 +123,11 @@ export const COLORS = {
     primary: '#22c55e', // Neon Green (Pure)
     secondary: '#15803d', // Darker Green
     glow: '#a3e635',      // Electric Lime Glow
+  },
+  vortex: {
+    primary: '#8b5cf6', // Violet Neon
+    secondary: '#6d28d9', // Deep Purple
+    glow: '#d946ef',      // Electric Magenta
   },
   enemy: {
     primary: '#4f46e5', // Electric Indigo

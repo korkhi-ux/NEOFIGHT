@@ -14,8 +14,9 @@ const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClas
   
   // Determine color based on class and ID
   let colorSet = id === 'enemy' ? COLORS.enemy : COLORS.player;
-  if (id === 'player' && classType === 'SLINGER') {
-      colorSet = COLORS.slinger;
+  if (id === 'player') {
+      if (classType === 'SLINGER') colorSet = COLORS.slinger;
+      if (classType === 'VORTEX') colorSet = COLORS.vortex;
   }
   
   return {
@@ -38,6 +39,16 @@ const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClas
     grapplePoint: null,
     grappleTargetId: null,
     grappleCooldownTimer: 0,
+    
+    // VORTEX
+    voidOrb: classType === 'VORTEX' ? {
+        active: false,
+        x: 0,
+        y: 0,
+        vx: 0,
+        vy: 0,
+        life: 0
+    } : undefined,
     
     aiState: id === 'enemy' ? {
         mode: 'neutral', 

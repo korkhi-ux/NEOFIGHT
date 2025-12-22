@@ -2,6 +2,46 @@
 import { Fighter, GameState } from '../types';
 
 export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState: GameState) => {
+    
+    // --- VORTEX: VOID ORB RENDER ---
+    if (f.classType === 'VORTEX' && f.voidOrb && f.voidOrb.active) {
+        const { x, y } = f.voidOrb;
+        
+        ctx.save();
+        ctx.translate(x, y);
+        
+        // Pulse
+        const pulse = Math.sin(gameState.frameCount * 0.2) * 5;
+        
+        // Glow
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = f.color.glow;
+        
+        // Black Core
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.arc(0, 0, 10 + pulse * 0.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Rim
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = f.color.glow;
+        ctx.stroke();
+        
+        // Suction Particles
+        if (Math.random() < 0.3) {
+             ctx.fillStyle = f.color.secondary;
+             const angle = Math.random() * Math.PI * 2;
+             const dist = 30 + Math.random() * 20;
+             const px = Math.cos(angle) * dist;
+             const py = Math.sin(angle) * dist;
+             ctx.fillRect(px, py, 4, 4);
+             // Note: These are purely visual per frame, no persistent state needed for simple suction
+        }
+
+        ctx.restore();
+    }
+
     // --- SLINGER: GRAPPLE ROPE RENDER (ORGANIC/JIGGLE) ---
     if (f.classType === 'SLINGER' && f.isGrappling && f.grapplePoint) {
         const startX = f.x + f.width/2;
@@ -132,20 +172,39 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
         ctx.shadowColor = f.color.glow;
     }
 
-    // Body Fill
-    ctx.fillStyle = f.color.primary;
-
     const bodyW = f.width;
     const bodyH = f.height;
 
-    ctx.beginPath();
-    ctx.roundRect(-bodyW/2, -bodyH, bodyW, bodyH, 8); 
-    ctx.fill();
-    
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = f.color.glow;
-    ctx.shadowBlur = 0; 
-    ctx.stroke();
+    // Body Render (GLITCH vs NORMAL)
+    if (f.classType === 'VORTEX') {
+        // --- GLITCH BODY ---
+        ctx.fillStyle = f.color.primary;
+        ctx.strokeStyle = f.color.glow;
+        
+        const slices = 5;
+        const sliceH = bodyH / slices;
+        
+        for(let i=0; i<slices; i++) {
+            const offset = (Math.random() - 0.5) * 8; // Random X shift
+            ctx.fillRect((-bodyW/2) + offset, -bodyH + (i*sliceH), bodyW, sliceH - 2);
+        }
+        
+        ctx.lineWidth = 1;
+        ctx.shadowBlur = 0;
+        ctx.strokeRect((-bodyW/2), -bodyH, bodyW, bodyH);
+
+    } else {
+        // --- STANDARD BODY ---
+        ctx.fillStyle = f.color.primary;
+        ctx.beginPath();
+        ctx.roundRect(-bodyW/2, -bodyH, bodyW, bodyH, 8); 
+        ctx.fill();
+        
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = f.color.glow;
+        ctx.shadowBlur = 0; 
+        ctx.stroke();
+    }
     
     if (f.hitFlashTimer <= 0) {
         ctx.fillStyle = '#fff';

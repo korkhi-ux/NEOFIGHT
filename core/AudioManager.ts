@@ -74,6 +74,31 @@ export class AudioManager {
     src.stop(this.ctx.currentTime + 0.15);
   }
 
+  playGlitch() {
+    if (!this.bufferNoise) return;
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.bufferNoise;
+    
+    // Random playback rate for digital artifact feel
+    src.playbackRate.value = 0.5 + Math.random() * 1.5; 
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.value = 2000;
+    
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.6, this.ctx.currentTime);
+    // Hard cut-off
+    gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 0.08); 
+    
+    src.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.masterGain);
+    
+    src.start();
+    src.stop(this.ctx.currentTime + 0.1);
+  }
+
   playHit(isHeavy: boolean) {
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();

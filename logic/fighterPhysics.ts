@@ -62,6 +62,59 @@ export const updateFighter = (
         f.comboCount = 0;
     }
 
+    // --- VORTEX SPECIAL: VOID ORB ---
+    if (f.classType === 'VORTEX' && f.voidOrb) {
+        // Orb Physics
+        if (f.voidOrb.active) {
+            f.voidOrb.life -= timeScale;
+            f.voidOrb.x += f.voidOrb.vx * timeScale;
+            f.voidOrb.y += f.voidOrb.vy * timeScale;
+            
+            // Wall clamp for Orb
+            if (f.voidOrb.x < 0) f.voidOrb.x = 0;
+            if (f.voidOrb.x > WORLD_WIDTH) f.voidOrb.x = WORLD_WIDTH;
+
+            if (f.voidOrb.life <= 0) {
+                f.voidOrb.active = false;
+            }
+        }
+
+        if (freshSpecial && f.grappleCooldownTimer <= 0) {
+            if (!f.voidOrb.active) {
+                // SPAWN ORB
+                f.voidOrb.active = true;
+                f.voidOrb.life = 120; // 2 seconds
+                f.voidOrb.x = f.x + f.width/2;
+                f.voidOrb.y = f.y + f.height/2;
+                f.voidOrb.vx = f.facing * 15;
+                f.voidOrb.vy = 0;
+                
+                audio?.playGlitch();
+            } else {
+                // TELEPORT TO ORB
+                createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.primary);
+                
+                f.x = f.voidOrb.x - f.width/2;
+                f.y = f.voidOrb.y - f.height/2;
+                
+                // Reset velocity slightly
+                f.vx = 0;
+                f.vy = 0;
+                f.isGrounded = false;
+                
+                // Visuals
+                f.scaleX = 0.2;
+                f.scaleY = 1.8;
+                f.voidOrb.active = false;
+                f.grappleCooldownTimer = 120; // Cooldown
+                
+                createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.glow);
+                audio?.playGlitch();
+                gameState.shake += 5;
+            }
+        }
+    }
+
     // --- SLINGER SPECIAL: TACTICAL GRAPPLE ---
     if (f.classType === 'SLINGER') {
         
@@ -201,13 +254,24 @@ export const updateFighter = (
       f.isDashing = true;
       f.dashTimer = stats.dashDuration;
       f.dashCooldown = stats.dashCooldown;
-      audio?.playDash();
       
       const dashDir = input.x !== 0 ? Math.sign(input.x) : f.facing;
       f.facing = dashDir as 1 | -1;
-      f.scaleX = 1.7; 
-      f.scaleY = 0.4; 
-      gameState.shake += 2;
+
+      // VORTEX "QUANTUM BLINK" START
+      if (f.classType === 'VORTEX') {
+          f.scaleX = 0.1; // Implosion
+          f.scaleY = 0.1;
+          audio?.playGlitch();
+          // Dont apply velocity, we teleport later
+          f.vx = 0;
+          f.vy = 0;
+      } else {
+          audio?.playDash();
+          f.scaleX = 1.7; 
+          f.scaleY = 0.4; 
+          gameState.shake += 2;
+      }
     }
 
     if (input.jump && (f.isGrounded || (f.classType === 'SLINGER' && f.isGrappling))) {
@@ -271,11 +335,34 @@ export const updateFighter = (
     
     if (f.isDashing) {
       f.dashTimer -= timeScale;
-      f.vx = f.facing * stats.dashSpeed;
-      f.vy = 0; 
+      
+      // VORTEX "QUANTUM BLINK" EXECUTION
+      if (f.classType === 'VORTEX') {
+          // Mid-dash teleport
+          if (Math.abs(f.dashTimer - (stats.dashDuration / 2)) < timeScale) {
+              f.x += f.facing * 350;
+              // Clamp
+              if (f.x < 0) f.x = 0;
+              if (f.x + f.width > WORLD_WIDTH) f.x = WORLD_WIDTH - f.width;
+              
+              // Explosion
+              f.scaleX = 1.6;
+              f.scaleY = 0.6;
+              gameState.shake += 5;
+              audio?.playGlitch();
+              createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.primary);
+          }
+          f.vx = 0; // Freeze in place/invisible during dash
+          f.vy = 0;
+      } else {
+          // Standard Dash
+          f.vx = f.facing * stats.dashSpeed;
+          f.vy = 0; 
+      }
+
       if (f.dashTimer <= 0) {
         f.isDashing = false;
-        f.vx *= 0.5;
+        if (f.classType !== 'VORTEX') f.vx *= 0.5;
       }
     } 
     else if (f.isAttacking) {
