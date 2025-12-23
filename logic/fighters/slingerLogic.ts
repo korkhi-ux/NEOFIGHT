@@ -3,7 +3,7 @@ import { Fighter, GameState } from '../../types';
 import { createShockwave, createParticles } from '../effectSpawners';
 import { GROUND_Y, WORLD_WIDTH, GRAPPLE_COOLDOWN, GRAPPLE_MAX_SPEED, GRAPPLE_RANGE } from '../../config/physics';
 
-const MISSED_COOLDOWN = 100; // Faster cooldown on manual release/miss
+const MISSED_COOLDOWN = 60; // Reduced penalty to encourage aggression
 
 export const updateSlinger = (
     f: Fighter, 
@@ -16,6 +16,7 @@ export const updateSlinger = (
     // 1. MANUAL RELEASE
     if (freshSpecial && f.isGrappling) {
         f.isGrappling = false;
+        f.isGrappleAttacking = false;
         f.grapplePoint = null;
         f.grappleTargetId = null;
         f.grappleCooldownTimer = MISSED_COOLDOWN; 
@@ -52,11 +53,17 @@ export const updateSlinger = (
             f.grapplePoint = hitPoint;
             f.grappleTargetId = hitTargetId;
             f.isGrounded = false;
+            
+            // ACTIVATE METEOR KICK STATE IF ENEMY HIT
+            if (hitTargetId === opponent.id) {
+                f.isGrappleAttacking = true;
+            }
+
             createShockwave(gameState, hitPoint.x, hitPoint.y, f.color.glow);
             createParticles(gameState, hitPoint.x, hitPoint.y, 12, f.color.glow, 8);
             f.vx += dirX * 5; f.vy -= 8;
         } else {
-            f.grappleCooldownTimer = 15; // Quick reset on pure miss (nothing found)
+            f.grappleCooldownTimer = 15; // Quick reset on pure miss
         }
     } 
     // 3. GRAPPLE PHYSICS
@@ -70,18 +77,25 @@ export const updateSlinger = (
 
         if (dist < 50) {
             f.isGrappling = false;
+            f.isGrappleAttacking = false;
             f.grapplePoint = null;
             f.grappleTargetId = null;
             f.grappleCooldownTimer = MISSED_COOLDOWN; 
             f.vx *= 0.8; f.vy *= 0.8;
         } else {
-            const pullForce = 4.0 * timeScale;
+            // Aggressive Pull Force: Doubles if attacking
+            const baseForce = 4.0;
+            const pullForce = (f.isGrappleAttacking ? baseForce * 2.0 : baseForce) * timeScale;
+            
             const angle = Math.atan2(dy, dx);
             f.vx += Math.cos(angle) * pullForce;
             f.vy += Math.sin(angle) * pullForce;
+            
+            const maxS = f.isGrappleAttacking ? GRAPPLE_MAX_SPEED * 1.5 : GRAPPLE_MAX_SPEED;
+            
             const speed = Math.sqrt(f.vx*f.vx + f.vy*f.vy);
-            if (speed > GRAPPLE_MAX_SPEED) {
-                const r = GRAPPLE_MAX_SPEED / speed;
+            if (speed > maxS) {
+                const r = maxS / speed;
                 f.vx *= r; f.vy *= r;
             }
         }

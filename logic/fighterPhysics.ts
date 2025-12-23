@@ -59,7 +59,7 @@ export const updateFighter = (
             updateSlinger(f, gameState, freshSpecial, opponent);
             break;
         case 'VORTEX':
-            updateVortex(f, gameState, freshSpecial, audio);
+            updateVortex(f, gameState, freshSpecial, opponent, audio); // Updated Signature
             break;
     }
     
@@ -70,6 +70,7 @@ export const updateFighter = (
     if (input.dash && f.dashCooldown <= 0 && !f.isDiving) {
       if (f.isGrappling) {
           f.isGrappling = false;
+          f.isGrappleAttacking = false; // Reset Slinger kick
           f.grapplePoint = null;
           f.grappleTargetId = null;
           f.grappleCooldownTimer = GRAPPLE_COOLDOWN;
@@ -101,6 +102,7 @@ export const updateFighter = (
     if (input.jump && (f.isGrounded || (f.classType === 'SLINGER' && f.isGrappling)) && !f.isDiving) {
        if (f.isGrappling) {
            f.isGrappling = false;
+           f.isGrappleAttacking = false; // Reset Slinger kick
            f.grapplePoint = null;
            f.grappleTargetId = null;
            f.grappleCooldownTimer = GRAPPLE_COOLDOWN;
@@ -121,6 +123,7 @@ export const updateFighter = (
     if (freshAttack && !f.isDashing && !f.isDiving) {
         if (f.isGrappling) {
              f.isGrappling = false;
+             f.isGrappleAttacking = false;
              f.grapplePoint = null;
              f.grappleTargetId = null;
              f.grappleCooldownTimer = GRAPPLE_COOLDOWN;
@@ -240,7 +243,7 @@ export const updateFighter = (
         }
         f.x = 0; f.vx = 0; 
         if (f.isGrappling || f.isDiving) {
-            f.isGrappling = false; f.isDiving = false; f.grapplePoint = null; f.grappleTargetId = null; f.grappleCooldownTimer = GRAPPLE_COOLDOWN; 
+            f.isGrappling = false; f.isGrappleAttacking = false; f.isDiving = false; f.grapplePoint = null; f.grappleTargetId = null; f.grappleCooldownTimer = GRAPPLE_COOLDOWN; 
         }
     }
     if (f.x + f.width > WORLD_WIDTH) { 
@@ -250,7 +253,7 @@ export const updateFighter = (
         }
         f.x = WORLD_WIDTH - f.width; f.vx = 0; 
         if (f.isGrappling || f.isDiving) { 
-            f.isGrappling = false; f.isDiving = false; f.grapplePoint = null; f.grappleTargetId = null; f.grappleCooldownTimer = GRAPPLE_COOLDOWN; 
+            f.isGrappling = false; f.isGrappleAttacking = false; f.isDiving = false; f.grapplePoint = null; f.grappleTargetId = null; f.grappleCooldownTimer = GRAPPLE_COOLDOWN; 
         }
     }
 

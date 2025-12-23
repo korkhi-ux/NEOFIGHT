@@ -40,6 +40,7 @@ const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClas
     // Initializing new mechanics fields
     specialPowerCharge: 0,
     isGrappling: false,
+    isGrappleAttacking: false, // New Slinger State
     grapplePoint: null,
     grappleTargetId: null,
     grappleCooldownTimer: 0,
@@ -54,7 +55,8 @@ const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClas
         y: 0,
         vx: 0,
         vy: 0,
-        life: 0
+        life: 0,
+        lastHitTimer: 0
     } : undefined,
     
     // KINETIC

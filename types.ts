@@ -82,6 +82,7 @@ export interface VoidOrb {
   vy: number;
   active: boolean;
   life: number;
+  lastHitTimer?: number; // Internal cooldown for multi-hit projectile
 }
 
 export interface Fighter {
@@ -116,6 +117,7 @@ export interface Fighter {
   // Class Specific Mechanics
   specialPowerCharge: number; 
   isGrappling?: boolean;
+  isGrappleAttacking?: boolean; // SLINGER: Flying towards enemy for kick
   grapplePoint?: Vector | null;
   grappleTargetId?: string | null; // ID of the entity we are hooked to
   grappleCooldownTimer: number; 

@@ -22,35 +22,35 @@ export const CLASS_STATS: Record<FighterClass, ClassStats> = {
         dashSpeed: 40, 
         dashDuration: 9,
         dashCooldown: 20, 
-        health: 100, // Normalized to 100 for better survivability
+        health: 100, 
         damageMult: 1.0,
         gravityScale: 1.0
     },
     SLINGER: { 
-        speed: PLAYER_SPEED * 1.2,
-        maxSpeed: 25, 
+        speed: PLAYER_SPEED * 1.3, // Buffed Speed
+        maxSpeed: 28, // Buffed Max Speed for aerial gameplay
         jumpForce: JUMP_FORCE, 
         dashSpeed: DASH_SPEED * 1.1,
         dashDuration: DASH_DURATION * 0.8,
         dashCooldown: DASH_COOLDOWN * 0.7,
-        health: 95, 
+        health: 105, // Buffed HP (+5)
         damageMult: 0.95,
         gravityScale: 1.0 
     },
     VORTEX: { 
-        speed: PLAYER_SPEED * 1.0,
+        speed: 4.2, // Buffed Speed (was ~3.5)
         maxSpeed: MAX_SPEED * 1.1,
         jumpForce: JUMP_FORCE * 1.1, 
         dashSpeed: 0, 
         dashDuration: DASH_DURATION,
         dashCooldown: 35, 
-        health: 100, // Normalized to 100
+        health: 100, 
         damageMult: 0.9,
         gravityScale: 0.65 
     },
     KINETIC: { 
         speed: 3.8, 
-        maxSpeed: 24, // Buffed max speed to compensate damage nerf
+        maxSpeed: 24, 
         jumpForce: JUMP_FORCE, 
         dashSpeed: 50, 
         dashDuration: 8,

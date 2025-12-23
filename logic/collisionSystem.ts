@@ -13,10 +13,10 @@ export const checkCollisions = (
     const { player, enemy } = gameState;
 
     const checkHit = (attacker: Fighter, defender: Fighter) => {
+      // 1. STANDARD ATTACK
       if (attacker.isAttacking) {
         const frameToHit = Math.floor(ATTACK_DURATIONS[attacker.comboCount] / 2);
         
-        // Ensure we haven't already hit with this specific attack
         if (!attacker.hasHit && attacker.attackTimer <= frameToHit && attacker.attackTimer > frameToHit - gameState.slowMoFactor * 1.5) {
             let range = ATTACK_RANGE;
             let heightMod = 0;
@@ -35,10 +35,37 @@ export const checkCollisions = (
               hitboxY < defender.y + defender.height &&
               hitboxY + hitboxH > defender.y
             ) {
-               attacker.hasHit = true; // Mark as hit to prevent multi-frame damage
+               attacker.hasHit = true; 
                handleHit(attacker, defender, gameState, audio, onGameOver);
             }
         }
+      }
+
+      // 2. SLINGER METEOR KICK (Collision Body Slam)
+      if (attacker.classType === 'SLINGER' && attacker.isGrappleAttacking) {
+          // Check simple body overlap
+          const overlap = (
+              attacker.x < defender.x + defender.width &&
+              attacker.x + attacker.width > defender.x &&
+              attacker.y < defender.y + defender.height &&
+              attacker.y + attacker.height > defender.y
+          );
+
+          if (overlap) {
+              handleHit(attacker, defender, gameState, audio, onGameOver, true); // true = forced critical
+              
+              // Slinger Specific Cleanup
+              attacker.isGrappleAttacking = false;
+              attacker.isGrappling = false;
+              attacker.grapplePoint = null;
+              attacker.grappleTargetId = null;
+              attacker.grappleCooldownTimer = 0; // RESET COOLDOWN (Reward)
+              
+              // Bounce Slinger back slightly
+              attacker.vx = -attacker.facing * 10;
+              attacker.vy = -15; 
+              gameState.shake += 10;
+          }
       }
     };
 
@@ -51,25 +78,21 @@ const handleHit = (
     defender: Fighter, 
     gameState: GameState, 
     audio: AudioManager | null, 
-    onGameOver: (winner: 'player' | 'enemy', pScore: number, eScore: number) => void
+    onGameOver: (winner: 'player' | 'enemy', pScore: number, eScore: number) => void,
+    forceCritical: boolean = false
 ) => {
     if (defender.isDashing) return; 
 
     // --- VOLT MECHANIC: STATIC FLOW (DASH RESET) ---
     if (attacker.classType === 'VOLT') {
-        attacker.dashCooldown = 0; // RESET
-        attacker.hitFlashTimer = 2; // Brief flash to confirm reset
-        
-        // Use standardized audio method
-        if (audio && audio.ctx.state === 'running') {
-            audio.playVoltReset();
-        }
+        attacker.dashCooldown = 0; 
+        attacker.hitFlashTimer = 2; 
+        if (audio && audio.ctx.state === 'running') audio.playVoltReset();
     }
 
     const impactX = defender.x + defender.width/2;
     const impactY = defender.y + defender.height/2;
 
-    // Visuals
     defender.hitFlashTimer = HIT_FLASH_DURATION; 
     
     const dx = defender.x - attacker.x;
@@ -81,9 +104,8 @@ const handleHit = (
     createImpact(gameState, impactX, impactY, '#ffffff');
 
     // --- DAMAGE CALCULATION ---
-    let baseDamage = ATTACK_DAMAGES[attacker.comboCount];
+    let baseDamage = ATTACK_DAMAGES[attacker.comboCount] || 8; // Default to 8 if not comboing (e.g. Kick)
     
-    // Apply Class Multiplier OR Dynamic Velocity Multiplier
     const multiplier = CLASS_STATS[attacker.classType].damageMult;
     let finalDamage = baseDamage * multiplier;
 
@@ -92,27 +114,42 @@ const handleHit = (
         finalDamage = baseDamage * attacker.dynamicDamageMult;
     }
 
+    // SLINGER AERIAL ACE PASSIVE
+    if (attacker.classType === 'SLINGER' && !attacker.isGrounded) {
+        finalDamage *= 1.2;
+    }
+
+    // SLINGER METEOR KICK CRIT
+    if (forceCritical) {
+        finalDamage *= 1.5;
+        createFlare(gameState, impactX, impactY, attacker.color.glow);
+    }
+
     // --- DAMAGE BASED FEEDBACK ---
-    // Proportional Shake: Scale shake based on damage (capped at 40)
-    // Typical damages: Light (5-8), Medium (10-15), Heavy (20-30+)
     gameState.shake = Math.min(40, finalDamage * 0.8);
 
-    const isHeavyHit = finalDamage > 20 || attacker.comboCount === 2;
+    const isHeavyHit = finalDamage > 20 || attacker.comboCount === 2 || forceCritical;
 
     if (isHeavyHit) {
         gameState.chromaticAberration = 8;
         createFlare(gameState, impactX, impactY, attacker.color.glow); 
-        audio?.playHit(true); // Heavy Sound
+        audio?.playHit(true); 
     } else {
-        audio?.playHit(false); // Light Sound
+        audio?.playHit(false); 
     }
 
     // Physics Application
-    const knockback = ATTACK_KNOCKBACKS[attacker.comboCount];
+    let knockback = ATTACK_KNOCKBACKS[attacker.comboCount] || 15;
+    let verticalKnock = -5;
+
+    if (forceCritical) {
+        knockback = 10; // Less horizontal push
+        verticalKnock = -30; // HUGE Vertical Launch (Juggling potential)
+    }
 
     defender.health -= finalDamage;
     defender.vx = attacker.facing * knockback;
-    defender.vy = -5;
+    defender.vy = verticalKnock;
     
     defender.scaleX = 0.5;
     defender.scaleY = 1.5;
