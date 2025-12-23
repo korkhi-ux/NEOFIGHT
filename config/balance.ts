@@ -16,25 +16,25 @@ interface ClassStats {
 
 export const CLASS_STATS: Record<FighterClass, ClassStats> = {
     VOLT: { 
-        speed: 4.0, 
+        speed: 4.1, 
         maxSpeed: 20, 
         jumpForce: JUMP_FORCE,
         dashSpeed: 40, 
         dashDuration: 9,
-        dashCooldown: 25, 
-        health: 90, 
+        dashCooldown: 20, 
+        health: 100, // Normalized to 100 for better survivability
         damageMult: 1.0,
         gravityScale: 1.0
     },
     SLINGER: { 
         speed: PLAYER_SPEED * 1.2,
-        maxSpeed: MAX_SPEED * 1.3,
+        maxSpeed: 25, 
         jumpForce: JUMP_FORCE, 
         dashSpeed: DASH_SPEED * 1.1,
         dashDuration: DASH_DURATION * 0.8,
         dashCooldown: DASH_COOLDOWN * 0.7,
-        health: 80,
-        damageMult: 0.8,
+        health: 95, 
+        damageMult: 0.95,
         gravityScale: 1.0 
     },
     VORTEX: { 
@@ -43,19 +43,19 @@ export const CLASS_STATS: Record<FighterClass, ClassStats> = {
         jumpForce: JUMP_FORCE * 1.1, 
         dashSpeed: 0, 
         dashDuration: DASH_DURATION,
-        dashCooldown: 40, 
-        health: 90,
+        dashCooldown: 35, 
+        health: 100, // Normalized to 100
         damageMult: 0.9,
-        gravityScale: 0.6 
+        gravityScale: 0.65 
     },
     KINETIC: { 
-        speed: 4.0, 
-        maxSpeed: 22, 
+        speed: 3.8, 
+        maxSpeed: 24, // Buffed max speed to compensate damage nerf
         jumpForce: JUMP_FORCE, 
         dashSpeed: 50, 
         dashDuration: 8,
         dashCooldown: 30,
-        health: 120, 
+        health: 130, 
         damageMult: 1.0, 
         gravityScale: 1.4 
     }
@@ -67,7 +67,7 @@ export const ATTACK_COOLDOWN = 10;
 export const COMBO_WINDOW = 30; 
 
 export const ATTACK_DURATIONS = [8, 10, 15]; 
-export const ATTACK_DAMAGES = [3, 6, 10]; 
-export const ATTACK_KNOCKBACKS = [5, 8, 25]; 
+export const ATTACK_DAMAGES = [4, 7, 12]; 
+export const ATTACK_KNOCKBACKS = [5, 10, 30]; 
 
 export const KNOCKBACK_FORCE = 15;

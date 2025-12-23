@@ -18,11 +18,14 @@ const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClas
   const classKey = classType.toLowerCase() as keyof typeof COLORS;
   const retrievedColor = COLORS[classKey];
   
-  // If player, use the class color. If enemy, use the enemy color theme.
-  // We check typeof object to distinguish between color themes and string config values in COLORS
-  const colorSet = (id === 'player' && typeof retrievedColor === 'object') 
-    ? retrievedColor 
-    : (id === 'player' ? COLORS.player : COLORS.enemy);
+  // Default to player or enemy theme
+  let colorSet = (id === 'player' ? COLORS.player : COLORS.enemy);
+
+  // If player, try to use specific class color if valid
+  // We check for 'primary' property to distinguish between color themes and other config values in COLORS (like strings or UI config)
+  if (id === 'player' && typeof retrievedColor === 'object' && retrievedColor && 'primary' in retrievedColor) {
+      colorSet = retrievedColor as { primary: string; secondary: string; glow: string; };
+  }
   
   return {
     id,
@@ -95,7 +98,8 @@ export const useGameLoop = (
     canvasRef: React.RefObject<HTMLCanvasElement>,
     gameActive: boolean,
     onGameOver: (winner: 'player' | 'enemy', pScore: number, eScore: number) => void,
-    playerClass: FighterClass = 'VOLT' // Defaulted to VOLT
+    playerClass: FighterClass = 'VOLT',
+    enemyClass: FighterClass = 'KINETIC'
 ) => {
     const inputManager = useRef(new InputManager());
     const audioManager = useRef<AudioManager | null>(null);
@@ -104,7 +108,7 @@ export const useGameLoop = (
     const gameState = useRef<GameState>({
         // START POSITIONS: Center of map +/- 200px (Closer start)
         player: createFighter('player', WORLD_WIDTH / 2 - 200, playerClass),
-        enemy: createFighter('enemy', WORLD_WIDTH / 2 + 200, 'VOLT'), 
+        enemy: createFighter('enemy', WORLD_WIDTH / 2 + 200, enemyClass), 
         particles: [],
         shockwaves: [],
         impacts: [],
@@ -140,7 +144,7 @@ export const useGameLoop = (
         gameState.current = {
             ...gameState.current,
             player: { ...createFighter('player', WORLD_WIDTH / 2 - 200, playerClass), score: currentPScore },
-            enemy: { ...createFighter('enemy', WORLD_WIDTH / 2 + 200, 'VOLT'), score: currentEScore },
+            enemy: { ...createFighter('enemy', WORLD_WIDTH / 2 + 200, enemyClass), score: currentEScore },
             gameActive: true,
             winner: null,
             slowMoFactor: 1.0,
@@ -218,7 +222,7 @@ export const useGameLoop = (
             inputManager.current.unmount();
             audioManager.current?.suspend();
         };
-    }, [gameActive, onGameOver, playerClass]); 
+    }, [gameActive, onGameOver, playerClass, enemyClass]); 
 
     return gameState;
 };

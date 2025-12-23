@@ -10,11 +10,12 @@ interface GameCanvasProps {
   onRestart: () => void;
   gameActive: boolean;
   playerClass: FighterClass;
+  enemyClass: FighterClass;
 }
 
-export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive, playerClass }) => {
+export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive, playerClass, enemyClass }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const gameStateRef = useGameLoop(canvasRef, gameActive, onGameOver, playerClass);
+  const gameStateRef = useGameLoop(canvasRef, gameActive, onGameOver, playerClass, enemyClass);
 
   return (
     <div className="relative w-full h-full flex items-center justify-center bg-black">
@@ -24,7 +25,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive, 
             <span>[ WASD/ZQSD ] MOVE</span>
             <span>[ SPACE ] DASH</span>
             <span>[ L-CLICK ] ATTACK</span>
-            <span className="text-cyan-500 font-bold ml-4">CLASS: {playerClass}</span>
+            <span className="text-cyan-500 font-bold ml-4">PLAYER: {playerClass}</span>
+            <span className="text-red-500 font-bold ml-4">ENEMY: {enemyClass}</span>
         </div>
         
         <canvas 

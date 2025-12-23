@@ -30,6 +30,12 @@ export const COLORS = {
     secondary: '#312e81',
     glow: '#6366f1',
   },
+  UI: {
+    bg: 'rgba(10, 10, 15, 0.9)',
+    border: '#22d3ee',
+    text: '#f8fafc',
+    accent: '#f472b6'
+  },
   background: '#050510', 
   backgroundFar: '#020205',
   grid: '#0f172a', 

@@ -97,16 +97,17 @@ const handleHit = (
         finalDamage = baseDamage * attacker.dynamicDamageMult;
     }
 
-    // --- HIGH VELOCITY FEEDBACK ---
-    const isHeavyHit = attacker.comboCount === 2 || (attacker.dynamicDamageMult && attacker.dynamicDamageMult > 1.5);
+    // --- DAMAGE BASED FEEDBACK ---
+    // If damage > 25, it's a "Heavy Hit" regardless of combo count
+    const isHeavyHit = finalDamage > 25 || attacker.comboCount === 2;
 
     if (isHeavyHit) {
         gameState.chromaticAberration = 8;
-        gameState.shake = 30; // Stronger shake
+        gameState.shake = 30; // Stronger shake for big hits
         createFlare(gameState, impactX, impactY, attacker.color.glow); 
         audio?.playHit(true); // Heavy Sound
     } else {
-        gameState.shake = 10;
+        gameState.shake = 10; // Lighter shake for standard hits
         audio?.playHit(false); // Light Sound
     }
 
