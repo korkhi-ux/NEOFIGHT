@@ -20,6 +20,8 @@ const chance = (pct: number) => Math.random() < pct;
 const getClassAction = (me: Fighter, opp: Fighter, dist: number, dx: number, gameState: GameState): AIInput => {
     const inputs: AIInput = { x: 0, jump: false, dash: false, attack: false, special: false };
     const facingOpp = Math.sign(dx) === me.facing;
+    const oppCenterX = opp.x + opp.width / 2;
+    const oppCenterY = opp.y + opp.height / 2;
 
     switch (me.classType) {
         // ============================================================
@@ -84,76 +86,91 @@ const getClassAction = (me: Fighter, opp: Fighter, dist: number, dx: number, gam
             break;
 
         // ============================================================
-        // C. SLINGER (THE AERIALIST)
-        // Style: "The Floor is Lava", Offensive Grapple
+        // C. SLINGER (THE AERIAL PREDATOR)
+        // Style: Never touches ground, Snipes with Grapple, Commits to Impact
         // ============================================================
         case 'SLINGER':
-            // 1. FLOOR IS LAVA
+            // 1. AERIAL PRIORITY (The Floor is Lava)
             if (me.isGrounded) {
-                if (chance(0.8)) inputs.jump = true; // Almost always jump immediately
+                // 90% chance to jump immediately if grounded
+                if (chance(0.9)) inputs.jump = true; 
             }
 
-            // 2. MOVEMENT
+            // 2. MOVEMENT & TARGETING
             inputs.x = Math.sign(dx);
 
-            // 3. GRAPPLE (Offensive)
+            // 3. GRAPPLE LOGIC (Meteor Kick Setup)
             if (me.grappleCooldownTimer <= 0 && !me.isGrappling) {
-                // Close range snatch
-                if (dist < 300 && facingOpp) {
+                // If we are AIRBORNE and facing opponent -> FIRE
+                if (!me.isGrounded && facingOpp && dist < 600) {
                     inputs.special = true;
                 }
-                // If opponent is in air, try to catch them
-                else if (!opp.isGrounded && dist < 500 && facingOpp && chance(0.5)) {
+                // Ground panic button if close
+                else if (dist < 200 && facingOpp) {
                     inputs.special = true;
                 }
             }
 
-            // 4. GRAPPLE FOLLOW-UP
-            // If we hooked someone, ATTACK immediately
-            if (me.isGrappling && me.grappleTargetId === opp.id) {
-                inputs.attack = true;
+            // 4. METEOR KICK COMMITMENT
+            // If we are flying towards them (Grapple Active), ensure we connect hard
+            if (me.isGrappling || me.isGrappleAttacking) {
+                inputs.x = Math.sign(dx); // Force direction towards enemy
+                inputs.attack = true;     // Spam attack to trigger crit on impact
+                
+                // If we hooked a wall above, jump to release momentum
+                if (!me.grappleTargetId && me.y < opp.y && chance(0.1)) {
+                     inputs.jump = true; 
+                }
             }
             
-            // 5. MIX-UP
-            // Cross up jump
-            if (dist < 100 && chance(0.1)) {
+            // 5. CROSS UP
+            if (dist < 100 && me.isGrounded && chance(0.2)) {
                 inputs.jump = true;
                 inputs.x = Math.sign(dx); // Jump over
             }
             break;
 
         // ============================================================
-        // D. VORTEX (THE TRICKSTER)
-        // Style: Confusion, Delayed Teleport, Cross-ups
+        // D. VORTEX (THE SPACE CONTROL NUKE)
+        // Style: Kiting, Radiation Trap, Teleport Execution
         // ============================================================
         case 'VORTEX':
-            inputs.x = Math.sign(dx);
-
-            // 1. DASH CROSS-UP
-            // If close, dash THROUGH opponent
-            if (dist < 150 && me.dashCooldown <= 0 && chance(0.3)) {
-                inputs.dash = true;
-                inputs.x = Math.sign(dx); 
+            // 1. MOVEMENT & KITING
+            // Vortex is fast (4.5 speed). If special is down and enemy is close, RUN.
+            if (dist < 100 && me.grappleCooldownTimer > 20) {
+                inputs.x = -Math.sign(dx); // Retreat
+                if (chance(0.1)) inputs.dash = true; // Panic dash away
+            } else {
+                inputs.x = Math.sign(dx); // Approach normally
             }
 
-            // 2. VOID ORB COMBO
+            // 2. VOID ORB STRATEGY
             if (me.grappleCooldownTimer <= 0) {
                 if (!me.voidOrb?.active) {
-                    // Phase A: Throw Orb
-                    if (dist > 200 && chance(0.15)) inputs.special = true;
+                    // PHASE A: DEPLOY TRAP
+                    // Ideal range: 200-450px. Throw it to create the radiation field.
+                    if (dist > 180 && dist < 450 && facingOpp) {
+                        inputs.special = true;
+                    }
                 } else {
-                    // Phase B: Teleport Logic
-                    // Wait a bit (simulate reading setup) then teleport
-                    const orbDist = Math.abs(me.voidOrb.x - opp.x);
-                    
-                    // If orb is behind opponent (Cross-up setup)
-                    const isCrossUp = (me.x < opp.x && me.voidOrb.x > opp.x) || (me.x > opp.x && me.voidOrb.x < opp.x);
-                    
-                    if (isCrossUp || orbDist < 100) {
-                         inputs.special = true; // TELEPORT
-                         inputs.attack = true;  // AMBUSH
+                    // PHASE B: EXECUTE (THE NUKE)
+                    // Calculate distance from ORB to ENEMY (Not AI to Enemy)
+                    const orbX = me.voidOrb.x;
+                    const orbY = me.voidOrb.y;
+                    const distOrbPlayer = Math.sqrt(Math.pow(orbX - oppCenterX, 2) + Math.pow(orbY - oppCenterY, 2));
+
+                    // If player is trapped in the singularity (< 160px), DETONATE.
+                    if (distOrbPlayer < 160) {
+                         inputs.special = true; // Teleport & Boom
+                         inputs.attack = true;  // Buffer attack frame 1
                     }
                 }
+            }
+
+            // 3. OPPORTUNISTIC DASH
+            // If enemy is far and we are safe, dash to close gap or cross up
+            if (dist > 400 && me.dashCooldown <= 0 && chance(0.05)) {
+                inputs.dash = true;
             }
             break;
     }
@@ -208,7 +225,12 @@ export const updateAI = (enemy: Fighter, player: Fighter, gameState: GameState):
              // If we suddenly get in range while walking, break the hold to attack
              if (dist < ATTACK_RANGE && !ai.nextMove.attack) {
                  ai.actionTimer = 0;
-             } else {
+             } 
+             // Slinger/Vortex special handling: interrupt movement to fire special
+             else if ((enemy.classType === 'SLINGER' || enemy.classType === 'VORTEX') && !ai.nextMove.special && enemy.grappleCooldownTimer <= 0) {
+                 ai.actionTimer = 0;
+             }
+             else {
                  return ai.nextMove;
              }
         }
@@ -224,7 +246,6 @@ export const updateAI = (enemy: Fighter, player: Fighter, gameState: GameState):
     if (dist < ATTACK_RANGE) {
         if (chance(0.95)) {
             inputs.attack = true;
-            // WE REMOVED THE FORCED STOP HERE to allow sticky attacks
         }
     }
 
