@@ -49,11 +49,30 @@ export const drawFighter = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
         case 'VORTEX': drawVortex(ctx, f, gameState); break;
     }
     
-    // Hit Flash Eye (Common)
+    // --- REACTOR EYES / DASH INDICATOR ---
+    // Only draw if not hit-flashing (generic hit flash overrides eyes)
     if (f.hitFlashTimer <= 0) {
-        ctx.fillStyle = '#fff'; ctx.shadowBlur = 5; ctx.shadowColor = '#fff';
+        const isReady = f.dashCooldown <= 0;
+        const isBlinking = !isReady && f.dashCooldown < 15 && Math.floor(Date.now() / 50) % 2 === 0;
+
+        ctx.save();
+        
+        if (isReady || isBlinking) {
+            // READY STATE: Pure White Hot
+            ctx.fillStyle = '#ffffff'; 
+            ctx.shadowBlur = 15; 
+            ctx.shadowColor = '#ffffff';
+        } else {
+            // RECHARGE STATE: Industrial Amber
+            ctx.fillStyle = '#fbbf24'; 
+            ctx.shadowBlur = 0;
+        }
+
         const eyeOffset = f.facing === 1 ? f.width/4 : -f.width/4 - 10;
+        // Draw the "Common" eye which acts as a pupil/status light on top of class visuals
         ctx.fillRect(eyeOffset, -f.height + 20, 15, 4);
+        
+        ctx.restore();
     }
 
     // --- ANIME NEEDLE BLADES ---
