@@ -224,10 +224,7 @@ export const updateAI = (enemy: Fighter, player: Fighter, gameState: GameState):
     if (dist < ATTACK_RANGE) {
         if (chance(0.95)) {
             inputs.attack = true;
-            // Stop moving to prevent sliding past (unless Kinetic who likes momentum)
-            if (enemy.classType !== 'KINETIC') {
-                inputs.x = 0; 
-            }
+            // WE REMOVED THE FORCED STOP HERE to allow sticky attacks
         }
     }
 

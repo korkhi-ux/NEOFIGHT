@@ -110,6 +110,9 @@ export interface Fighter {
   isAttacking: boolean;
   isDead: boolean;
 
+  // Combat State
+  hasHit: boolean; // Prevents multi-frame hits per single attack swing
+
   // Class Specific Mechanics
   specialPowerCharge: number; 
   isGrappling?: boolean;

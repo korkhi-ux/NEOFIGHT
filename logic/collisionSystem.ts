@@ -16,7 +16,8 @@ export const checkCollisions = (
       if (attacker.isAttacking) {
         const frameToHit = Math.floor(ATTACK_DURATIONS[attacker.comboCount] / 2);
         
-        if (attacker.attackTimer <= frameToHit && attacker.attackTimer > frameToHit - gameState.slowMoFactor * 1.5) {
+        // Ensure we haven't already hit with this specific attack
+        if (!attacker.hasHit && attacker.attackTimer <= frameToHit && attacker.attackTimer > frameToHit - gameState.slowMoFactor * 1.5) {
             let range = ATTACK_RANGE;
             let heightMod = 0;
             
@@ -34,6 +35,7 @@ export const checkCollisions = (
               hitboxY < defender.y + defender.height &&
               hitboxY + hitboxH > defender.y
             ) {
+               attacker.hasHit = true; // Mark as hit to prevent multi-frame damage
                handleHit(attacker, defender, gameState, audio, onGameOver);
             }
         }
@@ -58,16 +60,9 @@ const handleHit = (
         attacker.dashCooldown = 0; // RESET
         attacker.hitFlashTimer = 2; // Brief flash to confirm reset
         
-        // High pitch beep for feedback
+        // Use standardized audio method
         if (audio && audio.ctx.state === 'running') {
-            const osc = audio.ctx.createOscillator();
-            const g = audio.ctx.createGain();
-            osc.frequency.value = 1200;
-            g.gain.value = 0.1;
-            osc.connect(g);
-            g.connect(audio.masterGain);
-            osc.start();
-            osc.stop(audio.ctx.currentTime + 0.05);
+            audio.playVoltReset();
         }
     }
 

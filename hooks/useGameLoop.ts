@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import { GameState, Fighter, FighterClass } from '../types';
 import { COLORS } from '../config/colors';
@@ -46,6 +47,9 @@ const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClas
     grapplePoint: null,
     grappleTargetId: null,
     grappleCooldownTimer: 0,
+    
+    // Multi-Hit Fix
+    hasHit: false,
     
     // VORTEX
     voidOrb: classType === 'VORTEX' ? {

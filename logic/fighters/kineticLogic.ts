@@ -12,10 +12,9 @@ export const updateKinetic = (
     audio?: AudioManager
 ) => {
     // 1. VELOCITY CONVERTER
-    // Adjusted formula: Starts at 1.0x, adds +0.5x at speed 20, +1.0x at speed 40.
-    // Much smoother scaling to prevent one-shots.
+    // Capped at 2.5x max multiplier
     const currentSpeed = Math.sqrt(f.vx*f.vx + f.vy*f.vy);
-    f.dynamicDamageMult = 1.0 + (currentSpeed / 40);
+    f.dynamicDamageMult = Math.min(2.5, 1.0 + (currentSpeed / 40));
 
     // 2. SPECIAL: BLAST ENGINE
     if (freshSpecial && f.grappleCooldownTimer <= 0 && !f.isDiving) {

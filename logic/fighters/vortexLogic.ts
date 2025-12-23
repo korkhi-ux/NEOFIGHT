@@ -34,8 +34,13 @@ export const updateVortex = (
                 audio?.playGlitch();
             } else {
                 createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.primary);
-                f.x = f.voidOrb.x - f.width/2;
+                
+                // Teleport and Clamp to Screen Bounds
+                let targetX = f.voidOrb.x - f.width/2;
+                targetX = Math.max(0, Math.min(targetX, WORLD_WIDTH - f.width));
+                f.x = targetX;
                 f.y = f.voidOrb.y - f.height/2;
+                
                 f.vx = 0; f.vy = 0; f.isGrounded = false;
                 f.scaleX = 0.2; f.scaleY = 1.8;
                 f.voidOrb.active = false;

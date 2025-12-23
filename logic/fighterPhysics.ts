@@ -142,6 +142,7 @@ export const updateFighter = (
                 f.comboCount = 0;
             }
             f.isAttacking = true;
+            f.hasHit = false; // Reset Hit Flag
             f.attackTimer = ATTACK_DURATIONS[f.comboCount];
             f.comboTimer = COMBO_WINDOW; 
             f.scaleX = 1.3;

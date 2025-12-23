@@ -123,6 +123,18 @@ export class AudioManager {
     osc.stop(this.ctx.currentTime + 0.3);
   }
 
+  playVoltReset() {
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 1200;
+    gain.gain.value = 0.1;
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+    osc.start();
+    osc.stop(this.ctx.currentTime + 0.05);
+  }
+
   playKO() {
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();
