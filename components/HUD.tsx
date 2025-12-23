@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { GameState, FighterClass } from '../types';
 import { COLORS } from '../config/colors';
@@ -23,23 +24,21 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive, playerClass,
     
     const comboContainerRef = useRef<HTMLDivElement>(null);
     const comboTextRef = useRef<HTMLSpanElement>(null);
+    
+    const overlayTextRef = useRef<HTMLDivElement>(null);
 
-    // Initial state setup
     const [hudState, setHudState] = useState({
         pName: 'VOLT', eName: 'KINETIC',
         pScore: 0, eScore: 0,
         pColor: COLORS.volt, eColor: COLORS.kinetic
     });
 
-    // Helper to extract strict class color
     const getBarColor = (classType: FighterClass) => {
         const key = classType.toLowerCase() as keyof typeof COLORS;
         return (COLORS as any)[key] || COLORS.volt;
     };
 
     useEffect(() => {
-        // We initialize/update static HUD elements (Names, Colors) from Props
-        // We initialize Scores from the Ref (as they might persist)
         const { player, enemy } = gameStateRef.current;
         
         setHudState({
@@ -56,7 +55,33 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive, playerClass,
         const uiLoop = () => {
             if (!gameStateRef.current.gameActive) return;
 
-            const { player, enemy } = gameStateRef.current;
+            const { player, enemy, matchState, introTimer } = gameStateRef.current;
+
+            // --- OVERLAY TEXT LOGIC ---
+            if (overlayTextRef.current) {
+                if (matchState === 'intro') {
+                    if (introTimer > 40) {
+                        overlayTextRef.current.innerText = "READY";
+                        overlayTextRef.current.style.opacity = '1';
+                        overlayTextRef.current.style.transform = 'scale(1)';
+                        overlayTextRef.current.style.color = '#fbbf24'; // Amber
+                    } else {
+                        // Anticipation
+                         overlayTextRef.current.style.opacity = '0';
+                         overlayTextRef.current.style.transform = 'scale(0.5)';
+                    }
+                } else if (matchState === 'fight' && introTimer > -60) {
+                     // The first second of the fight
+                     overlayTextRef.current.innerText = "FIGHT";
+                     overlayTextRef.current.style.opacity = '1';
+                     overlayTextRef.current.style.transform = 'scale(1.5)';
+                     overlayTextRef.current.style.color = '#ef4444'; // Red
+                     // Fade out logic handled by CSS or frame decrement implied
+                     gameStateRef.current.introTimer--; // Hack to keep counting down for UI
+                } else {
+                    overlayTextRef.current.style.opacity = '0';
+                }
+            }
 
             // Ghost Health Logic
             if (player.ghostHealth > player.health) player.ghostHealth -= 0.5; else player.ghostHealth = player.health;
@@ -80,7 +105,7 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive, playerClass,
             if (specialPlayerRef.current) specialPlayerRef.current.style.width = `${pSpecialPct}%`;
             if (specialEnemyRef.current) specialEnemyRef.current.style.width = `${eSpecialPct}%`;
 
-            // Shake UI on hit
+            // Shake UI
             if (player.hitFlashTimer > 0 && hpContainerPlayerRef.current) {
                 const offset = Math.random() * 8;
                 hpContainerPlayerRef.current.style.transform = `skewX(-20deg) translate(${offset}px, ${offset}px)`;
@@ -95,7 +120,7 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive, playerClass,
                 hpContainerEnemyRef.current.style.transform = `skewX(20deg)`;
             }
 
-            // Combo Counter (Player only)
+            // Combo Counter
             if (comboContainerRef.current && comboTextRef.current) {
                 if (player.comboCount > 0 && player.comboTimer > 0) {
                     comboContainerRef.current.style.opacity = '1';
@@ -112,7 +137,7 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive, playerClass,
 
         const id = requestAnimationFrame(uiLoop);
         return () => cancelAnimationFrame(id);
-    }, [gameActive, playerClass, enemyClass]); // Re-run when classes change
+    }, [gameActive, playerClass, enemyClass]);
 
     return (
         <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-10 p-8">
@@ -139,11 +164,8 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive, playerClass,
                         </div>
                     </div>
 
-                    {/* Health Bar Container */}
                     <div ref={hpContainerPlayerRef} className="w-full h-8 bg-gray-900/80 border-2 border-white/10 relative overflow-hidden backdrop-blur-md shadow-[0_0_20px_rgba(0,0,0,0.5)]" style={{ transform: 'skewX(-20deg)' }}>
-                         {/* Ghost Bar */}
                          <div ref={hpPlayerGhostRef} className="absolute h-full bg-white transition-all duration-300 ease-out" style={{ width: '100%', opacity: 0.7 }}></div>
-                         {/* Main HP Bar */}
                          <div ref={hpPlayerRef} className="absolute h-full transition-all duration-75 ease-out" 
                               style={{ 
                                   width: '100%', 
@@ -153,14 +175,12 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive, playerClass,
                               }}>
                          </div>
                     </div>
-
-                    {/* Special Bar */}
                     <div className="w-[80%] h-2 bg-gray-900/80 border border-white/20 mt-1 relative overflow-hidden" style={{ transform: 'skewX(-20deg)' }}>
                          <div ref={specialPlayerRef} className="absolute h-full bg-yellow-400 shadow-[0_0_8px_#fbbf24] transition-all duration-100" style={{ width: '0%' }}></div>
                     </div>
                 </div>
 
-                {/* CENTER SCORE HEXAGON */}
+                {/* CENTER SCORE */}
                 <div className="absolute left-1/2 -translate-x-1/2 top-0 flex flex-col items-center">
                      <div className="w-24 h-20 bg-black/80 border-2 border-white/20 flex items-center justify-center relative backdrop-blur-sm" 
                           style={{ clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' }}>
@@ -194,11 +214,8 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive, playerClass,
                         </span>
                     </div>
 
-                    {/* Health Bar Container */}
                     <div ref={hpContainerEnemyRef} className="w-full h-8 bg-gray-900/80 border-2 border-white/10 relative overflow-hidden backdrop-blur-md shadow-[0_0_20px_rgba(0,0,0,0.5)]" style={{ transform: 'skewX(20deg)' }}>
-                         {/* Ghost Bar */}
                          <div ref={hpEnemyGhostRef} className="absolute right-0 h-full bg-white transition-all duration-300 ease-out" style={{ width: '100%', opacity: 0.7 }}></div>
-                         {/* Main HP Bar */}
                          <div ref={hpEnemyRef} className="absolute right-0 h-full transition-all duration-75 ease-out" 
                               style={{ 
                                   width: '100%', 
@@ -208,20 +225,24 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive, playerClass,
                               }}>
                          </div>
                     </div>
-
-                    {/* Special Bar */}
                     <div className="w-[80%] h-2 bg-gray-900/80 border border-white/20 mt-1 relative overflow-hidden" style={{ transform: 'skewX(20deg)' }}>
                          <div ref={specialEnemyRef} className="absolute right-0 h-full bg-red-400 shadow-[0_0_8px_#f87171] transition-all duration-100" style={{ width: '0%' }}></div>
                     </div>
                 </div>
             </div>
 
-            {/* Floating Combo Text */}
+            {/* COMBO TEXT */}
             <div ref={comboContainerRef} className="absolute top-[40%] left-[10%] transition-all duration-100 ease-out opacity-0 origin-center pointer-events-none">
                  <span ref={comboTextRef} className="text-6xl font-black italic text-yellow-400 drop-shadow-[4px_4px_0px_rgba(0,0,0,1)] tracking-tighter stroke-black" 
                        style={{ WebkitTextStroke: '2px black' }}>
                  </span>
                  <div className="text-white font-mono text-sm tracking-widest mt-2 ml-2">SUPER HIT</div>
+            </div>
+
+            {/* INTRO OVERLAY TEXT (READY / FIGHT) */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                 <div ref={overlayTextRef} className="text-9xl font-black italic font-orbitron transition-all duration-200 drop-shadow-[0_0_30px_rgba(0,0,0,0.8)] opacity-0 tracking-widest">
+                 </div>
             </div>
         </div>
     );

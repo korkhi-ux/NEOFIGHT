@@ -11,17 +11,12 @@ import { updateAI } from '../logic/aiBrain';
 import { checkCollisions } from '../logic/collisionSystem';
 import { updateCamera } from '../rendering/cameraSystem';
 import { renderGame } from '../rendering/gameRenderer';
+import { updateIntro, INTRO_DURATION } from '../logic/introSystem';
 
 const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClass = 'VOLT'): Fighter => {
   const stats = CLASS_STATS[classType];
-  
-  // --- COLOR LOGIC FIX ---
-  // Strictly use the class color for identity consistency.
-  // Kinetic is always Orange, Volt is always Cyan, etc.
   const classKey = classType.toLowerCase() as keyof typeof COLORS;
   const targetColor = COLORS[classKey] as { primary: string; secondary: string; glow: string; };
-  
-  // Fallback to Volt colors if something goes wrong, but never generic 'enemy' purple unless the class is unknown
   const finalColor = targetColor || COLORS.volt;
 
   return {
@@ -38,29 +33,19 @@ const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClas
     ghostHealth: stats.health,
     facing: id === 'player' ? 1 : -1,
     
-    // Initializing new mechanics fields
     specialPowerCharge: 0,
     isGrappling: false,
-    isGrappleAttacking: false, // New Slinger State
+    isGrappleAttacking: false,
     grapplePoint: null,
     grappleTargetId: null,
     grappleCooldownTimer: 0,
-    
-    // Multi-Hit Fix
     hasHit: false,
     
-    // VORTEX
     voidOrb: classType === 'VORTEX' ? {
         active: false,
-        x: 0,
-        y: 0,
-        vx: 0,
-        vy: 0,
-        life: 0,
-        lastHitTimer: 0
+        x: 0, y: 0, vx: 0, vy: 0, life: 0, lastHitTimer: 0
     } : undefined,
     
-    // KINETIC
     isDiving: false,
     dynamicDamageMult: 1.0,
     
@@ -91,7 +76,7 @@ const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClas
     scaleX: 1,
     scaleY: 1,
     rotation: 0,
-    color: finalColor, // Applied specific class color
+    color: finalColor,
     score: 0
   };
 };
@@ -109,7 +94,6 @@ export const useGameLoop = (
     const prevAttackInput = useRef<{ [key: string]: boolean }>({});
     
     const gameState = useRef<GameState>({
-        // START POSITIONS: Center of map +/- 200px (Closer start)
         player: createFighter('player', WORLD_WIDTH / 2 - 200, playerClass),
         enemy: createFighter('enemy', WORLD_WIDTH / 2 + 200, enemyClass), 
         particles: [],
@@ -125,6 +109,8 @@ export const useGameLoop = (
         cameraY: 0,
         cameraLookAhead: 0,
         cameraTilt: 0,
+        matchState: 'intro',
+        introTimer: INTRO_DURATION,
         winner: null,
         gameActive: false,
         frameCount: 0,
@@ -133,7 +119,6 @@ export const useGameLoop = (
         hitStop: 0
     });
 
-    // We use a ref to track paused state inside the loop closure without restarting it
     const isPausedRef = useRef(isPaused);
     useEffect(() => {
         isPausedRef.current = isPaused;
@@ -146,11 +131,9 @@ export const useGameLoop = (
         if (!audioManager.current) audioManager.current = new AudioManager();
         audioManager.current.resume();
 
-        // Preserve Scores when restarting
         const currentPScore = gameState.current.player.score;
         const currentEScore = gameState.current.enemy.score;
 
-        // Reset State with Selected Class
         gameState.current = {
             ...gameState.current,
             player: { ...createFighter('player', WORLD_WIDTH / 2 - 200, playerClass), score: currentPScore },
@@ -163,7 +146,9 @@ export const useGameLoop = (
             particles: [],
             shockwaves: [],
             impacts: [],
-            flares: []
+            flares: [],
+            matchState: 'intro',
+            introTimer: INTRO_DURATION
         };
 
         let animationFrameId: number;
@@ -171,19 +156,13 @@ export const useGameLoop = (
         const loop = () => {
             const state = gameState.current;
             
-            // Only update logic if NOT paused
             if (!isPausedRef.current) {
-                // --- HIT STOP LOGIC ---
-                // If Hit Stop is active, we skip the physics update for a few frames
                 if (state.hitStop > 0) {
                     state.hitStop--;
-                    state.shake *= 0.9; // Decay shake slightly even during freeze
-                    // We still render, but we don't update positions or AI
+                    state.shake *= 0.9; 
                 } else {
-                    // NORMAL UPDATE
                     state.frameCount++;
                     
-                    // Time & Env decay
                     if (state.slowMoTimer > 0) {
                         state.slowMoTimer--;
                         if (state.slowMoTimer <= 0) state.slowMoFactor = 1.0;
@@ -193,16 +172,27 @@ export const useGameLoop = (
                     state.shakeY *= 0.8;
                     state.chromaticAberration = Math.max(0, state.chromaticAberration * 0.8);
 
-                    // Logic
-                    const playerInput = inputManager.current.getPlayerInput();
-                    const aiInput = updateAI(state.enemy, state.player, state);
+                    // --- LOGIC BRANCHING ---
+                    if (state.matchState === 'intro') {
+                        updateIntro(state, audioManager.current);
+                        if (state.introTimer <= 0) {
+                            state.matchState = 'fight';
+                            // Spawn "Fight" flare
+                            state.flares.push({id: 'start', x: WORLD_WIDTH/2, y: GROUND_Y - 300, life: 30, color: '#fff'});
+                            audioManager.current?.playHit(true);
+                        }
+                    } 
+                    else if (state.matchState === 'fight') {
+                        const playerInput = inputManager.current.getPlayerInput();
+                        const aiInput = updateAI(state.enemy, state.player, state);
 
-                    updateFighter(state.player, playerInput, state, prevAttackInput.current, audioManager.current!);
-                    updateFighter(state.enemy, aiInput, state, prevAttackInput.current, audioManager.current!);
+                        updateFighter(state.player, playerInput, state, prevAttackInput.current, audioManager.current!);
+                        updateFighter(state.enemy, aiInput, state, prevAttackInput.current, audioManager.current!);
 
-                    checkCollisions(state, audioManager.current, onGameOver);
+                        checkCollisions(state, audioManager.current, onGameOver);
+                    }
 
-                    // Effect cleanup
+                    // Common Effect cleanup
                     for (let i = state.particles.length - 1; i >= 0; i--) {
                         const p = state.particles[i];
                         p.x += p.vx * state.slowMoFactor;
@@ -227,10 +217,8 @@ export const useGameLoop = (
                 }
             }
 
-            // Always Render (even when paused, to show the freeze frame)
             const ctx = canvasRef.current?.getContext('2d');
             if (ctx && canvasRef.current) {
-                // If paused, we don't update camera smoothing to prevent drift
                 if (!isPausedRef.current) {
                     updateCamera(state, canvasRef.current.width, canvasRef.current.height);
                 }

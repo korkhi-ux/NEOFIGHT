@@ -197,6 +197,9 @@ export interface GameState {
   cameraLookAhead: number;
   cameraTilt: number;
 
+  matchState: 'intro' | 'fight' | 'gameover'; // Added Phase control
+  introTimer: number; // Countdown for intro animations
+
   winner: 'player' | 'enemy' | null;
   gameActive: boolean;
   frameCount: number; // For flicker math
