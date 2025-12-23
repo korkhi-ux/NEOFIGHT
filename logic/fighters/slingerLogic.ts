@@ -61,7 +61,10 @@ export const updateSlinger = (
 
             createShockwave(gameState, hitPoint.x, hitPoint.y, f.color.glow);
             createParticles(gameState, hitPoint.x, hitPoint.y, 12, f.color.glow, 8);
-            f.vx += dirX * 5; f.vy -= 8;
+            
+            // High Initial Jerk (Projectile Speed simulation)
+            f.vx += dirX * 12; // Buffed from 5 to 12 for instant snap
+            f.vy -= 10; 
         } else {
             f.grappleCooldownTimer = 15; // Quick reset on pure miss
         }
@@ -84,7 +87,7 @@ export const updateSlinger = (
             f.vx *= 0.8; f.vy *= 0.8;
         } else {
             // Aggressive Pull Force: Doubles if attacking
-            const baseForce = 4.0;
+            const baseForce = 5.0; // Buffed: 4.0 -> 5.0
             const pullForce = (f.isGrappleAttacking ? baseForce * 2.0 : baseForce) * timeScale;
             
             const angle = Math.atan2(dy, dx);

@@ -21,31 +21,31 @@ export const CLASS_STATS: Record<FighterClass, ClassStats> = {
         jumpForce: JUMP_FORCE,
         dashSpeed: 40, 
         dashDuration: 9,
-        dashCooldown: 15, // Buffed to 15 (was 20)
+        dashCooldown: 15, 
         health: 100, 
         damageMult: 1.0,
         gravityScale: 1.0
     },
     SLINGER: { 
-        speed: PLAYER_SPEED * 1.3, 
+        speed: 4.1, // Adjusted to 4.1 as requested (Ground Speed)
         maxSpeed: 28, 
         jumpForce: JUMP_FORCE, 
         dashSpeed: DASH_SPEED * 1.1,
         dashDuration: DASH_DURATION * 0.8,
-        dashCooldown: 35, // Set to 35
-        health: 105, 
-        damageMult: 0.95,
+        dashCooldown: 35,
+        health: 115, // Buffed: 105 -> 115 (Survivor)
+        damageMult: 1.15, // Buffed: 0.95 -> 1.15 (Assassin Damage)
         gravityScale: 1.0 
     },
     VORTEX: { 
-        speed: 4.2, 
+        speed: 4.5, // Buffed: 4.2 -> 4.5 (Fastest walker)
         maxSpeed: MAX_SPEED * 1.1,
         jumpForce: JUMP_FORCE * 1.1, 
         dashSpeed: 0, 
         dashDuration: DASH_DURATION,
-        dashCooldown: 30, // Set to 30
+        dashCooldown: 30, 
         health: 100, 
-        damageMult: 0.9,
+        damageMult: 1.1, // Buffed: 0.9 -> 1.1 (Respectable damage)
         gravityScale: 0.65 
     },
     KINETIC: { 
@@ -54,7 +54,7 @@ export const CLASS_STATS: Record<FighterClass, ClassStats> = {
         jumpForce: JUMP_FORCE, 
         dashSpeed: 50, 
         dashDuration: 8,
-        dashCooldown: 40, // Set to 40 (Heavier feel)
+        dashCooldown: 40, 
         health: 130, 
         damageMult: 1.0, 
         gravityScale: 1.4 
