@@ -19,9 +19,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive, 
 
   return (
     <div className="relative w-full h-full flex items-center justify-center bg-black">
-        {/* HUD is hidden during pause via parent/css logic or just stays visible. 
-            We keep it visible for context. */}
-        <HUD gameStateRef={gameStateRef} gameActive={gameActive} />
+        {/* HUD receives explicit class props to ensure UI colors match selected characters */}
+        <HUD 
+            gameStateRef={gameStateRef} 
+            gameActive={gameActive} 
+            playerClass={playerClass}
+            enemyClass={enemyClass}
+        />
         
         <div className="absolute bottom-4 left-4 text-white/30 text-xs font-mono pointer-events-none flex gap-4 z-20">
             <span>[ ESC ] PAUSE</span>

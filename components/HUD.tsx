@@ -5,9 +5,11 @@ import { COLORS } from '../config/colors';
 interface HUDProps {
     gameStateRef: React.MutableRefObject<GameState>;
     gameActive: boolean;
+    playerClass: FighterClass;
+    enemyClass: FighterClass;
 }
 
-export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive }) => {
+export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive, playerClass, enemyClass }) => {
     const hpPlayerRef = useRef<HTMLDivElement>(null);
     const hpPlayerGhostRef = useRef<HTMLDivElement>(null);
     const specialPlayerRef = useRef<HTMLDivElement>(null);
@@ -36,21 +38,24 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive }) => {
     };
 
     useEffect(() => {
-        if (!gameActive) return;
-
-        // Initialize HUD with correct class info from the game state
+        // We initialize/update static HUD elements (Names, Colors) from Props
+        // We initialize Scores from the Ref (as they might persist)
         const { player, enemy } = gameStateRef.current;
         
         setHudState({
-            pName: player.classType,
-            eName: enemy.classType,
+            pName: playerClass,
+            eName: enemyClass,
             pScore: player.score,
             eScore: enemy.score,
-            pColor: getBarColor(player.classType),
-            eColor: getBarColor(enemy.classType)
+            pColor: getBarColor(playerClass),
+            eColor: getBarColor(enemyClass)
         });
 
+        if (!gameActive) return;
+
         const uiLoop = () => {
+            if (!gameStateRef.current.gameActive) return;
+
             const { player, enemy } = gameStateRef.current;
 
             // Ghost Health Logic
@@ -68,7 +73,7 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive }) => {
             if (hpEnemyRef.current) hpEnemyRef.current.style.width = `${Math.max(0, eHealthPct)}%`;
             if (hpEnemyGhostRef.current) hpEnemyGhostRef.current.style.width = `${Math.max(0, eGhostPct)}%`;
 
-            // Special Bar Logic (Approximate visualization)
+            // Special Bar Logic
             const pSpecialPct = Math.max(0, 100 - (player.grappleCooldownTimer * 1.5));
             const eSpecialPct = Math.max(0, 100 - (enemy.grappleCooldownTimer * 1.5));
             
@@ -102,14 +107,12 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive }) => {
                 }
             }
 
-            if (gameStateRef.current.gameActive) {
-                requestAnimationFrame(uiLoop);
-            }
+            requestAnimationFrame(uiLoop);
         };
 
         const id = requestAnimationFrame(uiLoop);
         return () => cancelAnimationFrame(id);
-    }, [gameActive]);
+    }, [gameActive, playerClass, enemyClass]); // Re-run when classes change
 
     return (
         <div className="absolute top-0 left-0 w-full h-full pointer-events-none z-10 p-8">
