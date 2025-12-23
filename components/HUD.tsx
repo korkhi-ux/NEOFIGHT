@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { GameState } from '../types';
 import { COLORS } from '../config/colors';

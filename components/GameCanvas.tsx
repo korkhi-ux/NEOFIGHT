@@ -1,4 +1,3 @@
-
 import React, { useRef } from 'react';
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../config/physics';
 import { useGameLoop } from '../hooks/useGameLoop';
@@ -9,24 +8,27 @@ interface GameCanvasProps {
   onGameOver: (winner: 'player' | 'enemy', pScore: number, eScore: number) => void;
   onRestart: () => void;
   gameActive: boolean;
+  isPaused: boolean;
   playerClass: FighterClass;
   enemyClass: FighterClass;
 }
 
-export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive, playerClass, enemyClass }) => {
+export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive, isPaused, playerClass, enemyClass }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const gameStateRef = useGameLoop(canvasRef, gameActive, onGameOver, playerClass, enemyClass);
+  const gameStateRef = useGameLoop(canvasRef, gameActive, isPaused, onGameOver, playerClass, enemyClass);
 
   return (
     <div className="relative w-full h-full flex items-center justify-center bg-black">
+        {/* HUD is hidden during pause via parent/css logic or just stays visible. 
+            We keep it visible for context. */}
         <HUD gameStateRef={gameStateRef} gameActive={gameActive} />
         
-        <div className="absolute bottom-4 left-4 text-white/30 text-xs font-mono pointer-events-none flex gap-4">
+        <div className="absolute bottom-4 left-4 text-white/30 text-xs font-mono pointer-events-none flex gap-4 z-20">
+            <span>[ ESC ] PAUSE</span>
             <span>[ WASD/ZQSD ] MOVE</span>
             <span>[ SPACE ] DASH</span>
             <span>[ L-CLICK ] ATTACK</span>
-            <span className="text-cyan-500 font-bold ml-4">PLAYER: {playerClass}</span>
-            <span className="text-red-500 font-bold ml-4">ENEMY: {enemyClass}</span>
+            <span>[ R-CLICK ] SPECIAL</span>
         </div>
         
         <canvas 

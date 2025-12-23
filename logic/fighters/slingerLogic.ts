@@ -3,6 +3,8 @@ import { Fighter, GameState } from '../../types';
 import { createShockwave, createParticles } from '../effectSpawners';
 import { GROUND_Y, WORLD_WIDTH, GRAPPLE_COOLDOWN, GRAPPLE_MAX_SPEED, GRAPPLE_RANGE } from '../../config/physics';
 
+const MISSED_COOLDOWN = 100; // Faster cooldown on manual release/miss
+
 export const updateSlinger = (
     f: Fighter, 
     gameState: GameState, 
@@ -11,14 +13,16 @@ export const updateSlinger = (
 ) => {
     const timeScale = gameState.slowMoFactor;
 
+    // 1. MANUAL RELEASE
     if (freshSpecial && f.isGrappling) {
         f.isGrappling = false;
         f.grapplePoint = null;
         f.grappleTargetId = null;
-        f.grappleCooldownTimer = GRAPPLE_COOLDOWN; 
+        f.grappleCooldownTimer = MISSED_COOLDOWN; 
         f.vx *= 1.2; f.vy *= 1.2;
         createShockwave(gameState, f.x + f.width/2, f.y + f.height/2, f.color.glow);
     }
+    // 2. FIRE GRAPPLE
     else if (freshSpecial && !f.isGrappling && f.grappleCooldownTimer <= 0) {
         const originX = f.x + f.width / 2;
         const originY = f.y + f.height * 0.55; 
@@ -52,9 +56,10 @@ export const updateSlinger = (
             createParticles(gameState, hitPoint.x, hitPoint.y, 12, f.color.glow, 8);
             f.vx += dirX * 5; f.vy -= 8;
         } else {
-            f.grappleCooldownTimer = 15; 
+            f.grappleCooldownTimer = 15; // Quick reset on pure miss (nothing found)
         }
     } 
+    // 3. GRAPPLE PHYSICS
     else if (f.isGrappling && f.grapplePoint) {
         if (f.grappleTargetId) {
             f.grapplePoint = { x: opponent.x + opponent.width/2, y: opponent.y + opponent.height/2 };
@@ -67,7 +72,7 @@ export const updateSlinger = (
             f.isGrappling = false;
             f.grapplePoint = null;
             f.grappleTargetId = null;
-            f.grappleCooldownTimer = GRAPPLE_COOLDOWN; 
+            f.grappleCooldownTimer = MISSED_COOLDOWN; 
             f.vx *= 0.8; f.vy *= 0.8;
         } else {
             const pullForce = 4.0 * timeScale;

@@ -22,7 +22,6 @@ const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClas
   let colorSet = (id === 'player' ? COLORS.player : COLORS.enemy);
 
   // If player, try to use specific class color if valid
-  // We check for 'primary' property to distinguish between color themes and other config values in COLORS (like strings or UI config)
   if (id === 'player' && typeof retrievedColor === 'object' && retrievedColor && 'primary' in retrievedColor) {
       colorSet = retrievedColor as { primary: string; secondary: string; glow: string; };
   }
@@ -97,6 +96,7 @@ const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClas
 export const useGameLoop = (
     canvasRef: React.RefObject<HTMLCanvasElement>,
     gameActive: boolean,
+    isPaused: boolean,
     onGameOver: (winner: 'player' | 'enemy', pScore: number, eScore: number) => void,
     playerClass: FighterClass = 'VOLT',
     enemyClass: FighterClass = 'KINETIC'
@@ -129,6 +129,12 @@ export const useGameLoop = (
         slowMoTimer: 0
     });
 
+    // We use a ref to track paused state inside the loop closure without restarting it
+    const isPausedRef = useRef(isPaused);
+    useEffect(() => {
+        isPausedRef.current = isPaused;
+    }, [isPaused]);
+
     useEffect(() => {
         if (!gameActive) return;
 
@@ -159,54 +165,61 @@ export const useGameLoop = (
 
         const loop = () => {
             const state = gameState.current;
-            state.frameCount++;
             
-            // Time & Env decay
-            if (state.slowMoTimer > 0) {
-                state.slowMoTimer--;
-                if (state.slowMoTimer <= 0) state.slowMoFactor = 1.0;
-            }
-            state.shake *= 0.8;
-            state.shakeX *= 0.8;
-            state.shakeY *= 0.8;
-            state.chromaticAberration = Math.max(0, state.chromaticAberration * 0.8);
+            // Only update logic if NOT paused
+            if (!isPausedRef.current) {
+                state.frameCount++;
+                
+                // Time & Env decay
+                if (state.slowMoTimer > 0) {
+                    state.slowMoTimer--;
+                    if (state.slowMoTimer <= 0) state.slowMoFactor = 1.0;
+                }
+                state.shake *= 0.8;
+                state.shakeX *= 0.8;
+                state.shakeY *= 0.8;
+                state.chromaticAberration = Math.max(0, state.chromaticAberration * 0.8);
 
-            // Logic
-            const playerInput = inputManager.current.getPlayerInput();
-            const aiInput = updateAI(state.enemy, state.player, state);
+                // Logic
+                const playerInput = inputManager.current.getPlayerInput();
+                const aiInput = updateAI(state.enemy, state.player, state);
 
-            updateFighter(state.player, playerInput, state, prevAttackInput.current, audioManager.current!);
-            updateFighter(state.enemy, aiInput, state, prevAttackInput.current, audioManager.current!);
+                updateFighter(state.player, playerInput, state, prevAttackInput.current, audioManager.current!);
+                updateFighter(state.enemy, aiInput, state, prevAttackInput.current, audioManager.current!);
 
-            checkCollisions(state, audioManager.current, onGameOver);
+                checkCollisions(state, audioManager.current, onGameOver);
 
-            // Effect cleanup
-            for (let i = state.particles.length - 1; i >= 0; i--) {
-                const p = state.particles[i];
-                p.x += p.vx * state.slowMoFactor;
-                p.y += p.vy * state.slowMoFactor;
-                p.life -= state.slowMoFactor;
-                if (p.life <= 0) state.particles.splice(i, 1);
-            }
-            for (let i = state.shockwaves.length - 1; i >= 0; i--) {
-                const s = state.shockwaves[i];
-                s.radius += 20 * state.slowMoFactor;
-                s.alpha -= 0.1 * state.slowMoFactor;
-                if (s.alpha <= 0) state.shockwaves.splice(i, 1);
-            }
-            for (let i = state.impacts.length - 1; i >= 0; i--) {
-                state.impacts[i].life -= state.slowMoFactor;
-                if (state.impacts[i].life <= 0) state.impacts.splice(i, 1);
-            }
-            for (let i = state.flares.length - 1; i >= 0; i--) {
-                state.flares[i].life -= state.slowMoFactor;
-                if (state.flares[i].life <= 0) state.flares.splice(i, 1);
+                // Effect cleanup
+                for (let i = state.particles.length - 1; i >= 0; i--) {
+                    const p = state.particles[i];
+                    p.x += p.vx * state.slowMoFactor;
+                    p.y += p.vy * state.slowMoFactor;
+                    p.life -= state.slowMoFactor;
+                    if (p.life <= 0) state.particles.splice(i, 1);
+                }
+                for (let i = state.shockwaves.length - 1; i >= 0; i--) {
+                    const s = state.shockwaves[i];
+                    s.radius += 20 * state.slowMoFactor;
+                    s.alpha -= 0.1 * state.slowMoFactor;
+                    if (s.alpha <= 0) state.shockwaves.splice(i, 1);
+                }
+                for (let i = state.impacts.length - 1; i >= 0; i--) {
+                    state.impacts[i].life -= state.slowMoFactor;
+                    if (state.impacts[i].life <= 0) state.impacts.splice(i, 1);
+                }
+                for (let i = state.flares.length - 1; i >= 0; i--) {
+                    state.flares[i].life -= state.slowMoFactor;
+                    if (state.flares[i].life <= 0) state.flares.splice(i, 1);
+                }
             }
 
-            // Render
+            // Always Render (even when paused, to show the freeze frame)
             const ctx = canvasRef.current?.getContext('2d');
             if (ctx && canvasRef.current) {
-                updateCamera(state, canvasRef.current.width, canvasRef.current.height);
+                // If paused, we don't update camera smoothing to prevent drift
+                if (!isPausedRef.current) {
+                    updateCamera(state, canvasRef.current.width, canvasRef.current.height);
+                }
                 renderGame(ctx, state, audioManager.current);
             }
 
@@ -222,7 +235,7 @@ export const useGameLoop = (
             inputManager.current.unmount();
             audioManager.current?.suspend();
         };
-    }, [gameActive, onGameOver, playerClass, enemyClass]); 
+    }, [gameActive, onGameOver, playerClass, enemyClass]); // Removed isPaused from dependency array to prevent restart
 
     return gameState;
 };

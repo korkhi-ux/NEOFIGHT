@@ -6,16 +6,9 @@ export const drawSlinger = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
     if (f.isGrappling && f.grapplePoint) {
         // Calculate relative coordinates
         const startX = 0; 
-        const startY = -f.height * 0.45; // Chest height relative to feet
+        const startY = -f.height * 0.65; // Chest height (moved up from 0.45)
         
-        // We need world coordinates of grapple point to map to local space
-        // Local space is rotated. This is tricky.
-        // Simplest way: Untransform the grapple point.
-        // Or simpler: Draw the rope in World Space in drawEffects? 
-        // The prompt says separate responsibilities. Slinger draws its rope.
-        // Let's draw it here. We need to handle the rotation carefully or draw line to a rotated point.
-        
-        // Actually, let's reverse transform the target point into local space
+        // Reverse transform the target point into local space
         const dx = f.grapplePoint.x - (f.x + f.width/2);
         const dy = f.grapplePoint.y - (f.y + f.height);
         
@@ -30,10 +23,11 @@ export const drawSlinger = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
         const coreColor = isEnemyHook ? '#ffffff' : '#ccffcc';
 
         ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-        const segments = 30; 
+        const segments = 40; // Increased segments for smoother curve
         const dist = Math.sqrt(Math.pow(localEndX - startX, 2) + Math.pow(localEndY - startY, 2));
         const tightness = Math.min(dist / 600, 1);
-        const amplitude = 15 * tightness + 2; const freq = gameState.frameCount * 0.8;
+        const amplitude = 12 * tightness + 1; 
+        const freq = gameState.frameCount * 0.8;
 
         for (let i = 0; i < segments; i++) {
             const t = i / segments; const tNext = (i + 1) / segments;
@@ -41,20 +35,30 @@ export const drawSlinger = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
             const x2 = startX + (localEndX - startX) * tNext; const y2 = startY + (localEndY - startY) * tNext;
             const damp1 = Math.sin(t * Math.PI); const damp2 = Math.sin(tNext * Math.PI);
             const nx = -(localEndY - startY) / dist; const ny = (localEndX - startX) / dist;
-            const wave1 = Math.sin(t * 10 + freq) * amplitude * damp1;
-            const wave2 = Math.sin(tNext * 10 + freq) * amplitude * damp2;
-            const jitterX = (Math.random() - 0.5) * 6 * damp1; const jitterY = (Math.random() - 0.5) * 6 * damp1;
+            const wave1 = Math.sin(t * 12 + freq) * amplitude * damp1;
+            const wave2 = Math.sin(tNext * 12 + freq) * amplitude * damp2;
+            const jitterX = (Math.random() - 0.5) * 4 * damp1; const jitterY = (Math.random() - 0.5) * 4 * damp1;
 
             const finalX1 = x1 + nx * wave1 + jitterX; const finalY1 = y1 + ny * wave1 + jitterY;
             const finalX2 = x2 + nx * wave2; const finalY2 = y2 + ny * wave2;
 
             ctx.beginPath(); ctx.moveTo(finalX1, finalY1); ctx.lineTo(finalX2, finalY2);
-            const thickness = 6 * (1 - t) + 1; ctx.lineWidth = thickness;
-            ctx.strokeStyle = baseColor; ctx.shadowColor = f.color.primary; ctx.shadowBlur = 15; ctx.stroke();
-            if (thickness > 2) { ctx.lineWidth = thickness * 0.4; ctx.strokeStyle = coreColor; ctx.shadowBlur = 0; ctx.stroke(); }
+            const thickness = 7 * (1 - t) + 2; 
+            ctx.lineWidth = thickness;
+            ctx.strokeStyle = baseColor; ctx.shadowColor = f.color.primary; ctx.shadowBlur = 10; ctx.stroke();
+            
+            // Inner Core
+            if (thickness > 3) { 
+                ctx.lineWidth = thickness * 0.4; 
+                ctx.strokeStyle = coreColor; 
+                ctx.shadowBlur = 0; 
+                ctx.stroke(); 
+            }
         }
+        
+        // Anchor point glow
         ctx.fillStyle = coreColor; ctx.shadowBlur = 20; ctx.shadowColor = baseColor;
-        ctx.beginPath(); ctx.arc(localEndX, localEndY, 6 + Math.random() * 4, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(localEndX, localEndY, 5 + Math.random() * 3, 0, Math.PI*2); ctx.fill();
         ctx.restore();
     }
 
