@@ -169,7 +169,8 @@ const handleHit = (
     }
 
     // --- DAMAGE BASED FEEDBACK ---
-    gameState.shake = Math.min(40, finalDamage * 0.8);
+    // Proportional shake, uncapped for massive impact feel
+    gameState.shake = finalDamage * 0.8;
 
     const isHeavyHit = finalDamage > 20 || attacker.comboCount === 2 || forceCritical;
 
@@ -202,7 +203,6 @@ const handleHit = (
     createShockwave(gameState, impactX, impactY, attacker.color.glow);
 
     // --- IMMEDIATE DEATH CHECK (Optional optimization) ---
-    // We check here for immediate feedback, but the Global Check in checkCollisions is the fallback.
     if (defender.health <= 0 && !defender.isDead) {
         triggerDeath(defender, attacker, gameState, audio, onGameOver);
     }

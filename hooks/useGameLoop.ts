@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import { GameState, Fighter, FighterClass } from '../types';
 import { COLORS } from '../config/colors';
@@ -128,7 +129,8 @@ export const useGameLoop = (
         gameActive: false,
         frameCount: 0,
         slowMoFactor: 1.0,
-        slowMoTimer: 0
+        slowMoTimer: 0,
+        hitStop: 0
     });
 
     // We use a ref to track paused state inside the loop closure without restarting it
@@ -157,6 +159,7 @@ export const useGameLoop = (
             winner: null,
             slowMoFactor: 1.0,
             slowMoTimer: 0,
+            hitStop: 0,
             particles: [],
             shockwaves: [],
             impacts: [],
@@ -170,48 +173,57 @@ export const useGameLoop = (
             
             // Only update logic if NOT paused
             if (!isPausedRef.current) {
-                state.frameCount++;
-                
-                // Time & Env decay
-                if (state.slowMoTimer > 0) {
-                    state.slowMoTimer--;
-                    if (state.slowMoTimer <= 0) state.slowMoFactor = 1.0;
-                }
-                state.shake *= 0.8;
-                state.shakeX *= 0.8;
-                state.shakeY *= 0.8;
-                state.chromaticAberration = Math.max(0, state.chromaticAberration * 0.8);
+                // --- HIT STOP LOGIC ---
+                // If Hit Stop is active, we skip the physics update for a few frames
+                if (state.hitStop > 0) {
+                    state.hitStop--;
+                    state.shake *= 0.9; // Decay shake slightly even during freeze
+                    // We still render, but we don't update positions or AI
+                } else {
+                    // NORMAL UPDATE
+                    state.frameCount++;
+                    
+                    // Time & Env decay
+                    if (state.slowMoTimer > 0) {
+                        state.slowMoTimer--;
+                        if (state.slowMoTimer <= 0) state.slowMoFactor = 1.0;
+                    }
+                    state.shake *= 0.8;
+                    state.shakeX *= 0.8;
+                    state.shakeY *= 0.8;
+                    state.chromaticAberration = Math.max(0, state.chromaticAberration * 0.8);
 
-                // Logic
-                const playerInput = inputManager.current.getPlayerInput();
-                const aiInput = updateAI(state.enemy, state.player, state);
+                    // Logic
+                    const playerInput = inputManager.current.getPlayerInput();
+                    const aiInput = updateAI(state.enemy, state.player, state);
 
-                updateFighter(state.player, playerInput, state, prevAttackInput.current, audioManager.current!);
-                updateFighter(state.enemy, aiInput, state, prevAttackInput.current, audioManager.current!);
+                    updateFighter(state.player, playerInput, state, prevAttackInput.current, audioManager.current!);
+                    updateFighter(state.enemy, aiInput, state, prevAttackInput.current, audioManager.current!);
 
-                checkCollisions(state, audioManager.current, onGameOver);
+                    checkCollisions(state, audioManager.current, onGameOver);
 
-                // Effect cleanup
-                for (let i = state.particles.length - 1; i >= 0; i--) {
-                    const p = state.particles[i];
-                    p.x += p.vx * state.slowMoFactor;
-                    p.y += p.vy * state.slowMoFactor;
-                    p.life -= state.slowMoFactor;
-                    if (p.life <= 0) state.particles.splice(i, 1);
-                }
-                for (let i = state.shockwaves.length - 1; i >= 0; i--) {
-                    const s = state.shockwaves[i];
-                    s.radius += 20 * state.slowMoFactor;
-                    s.alpha -= 0.1 * state.slowMoFactor;
-                    if (s.alpha <= 0) state.shockwaves.splice(i, 1);
-                }
-                for (let i = state.impacts.length - 1; i >= 0; i--) {
-                    state.impacts[i].life -= state.slowMoFactor;
-                    if (state.impacts[i].life <= 0) state.impacts.splice(i, 1);
-                }
-                for (let i = state.flares.length - 1; i >= 0; i--) {
-                    state.flares[i].life -= state.slowMoFactor;
-                    if (state.flares[i].life <= 0) state.flares.splice(i, 1);
+                    // Effect cleanup
+                    for (let i = state.particles.length - 1; i >= 0; i--) {
+                        const p = state.particles[i];
+                        p.x += p.vx * state.slowMoFactor;
+                        p.y += p.vy * state.slowMoFactor;
+                        p.life -= state.slowMoFactor;
+                        if (p.life <= 0) state.particles.splice(i, 1);
+                    }
+                    for (let i = state.shockwaves.length - 1; i >= 0; i--) {
+                        const s = state.shockwaves[i];
+                        s.radius += 20 * state.slowMoFactor;
+                        s.alpha -= 0.1 * state.slowMoFactor;
+                        if (s.alpha <= 0) state.shockwaves.splice(i, 1);
+                    }
+                    for (let i = state.impacts.length - 1; i >= 0; i--) {
+                        state.impacts[i].life -= state.slowMoFactor;
+                        if (state.impacts[i].life <= 0) state.impacts.splice(i, 1);
+                    }
+                    for (let i = state.flares.length - 1; i >= 0; i--) {
+                        state.flares[i].life -= state.slowMoFactor;
+                        if (state.flares[i].life <= 0) state.flares.splice(i, 1);
+                    }
                 }
             }
 

@@ -122,6 +122,20 @@ export interface Fighter {
   grappleTargetId?: string | null; // ID of the entity we are hooked to
   grappleCooldownTimer: number; 
 
+  // VOLT Mechanics
+  lightningTrail?: {
+    active: boolean;
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+    life: number;
+    // Ghost Afterimage Props
+    ghostX: number;
+    ghostY: number;
+    ghostFacing: 1 | -1;
+  };
+
   // VORTEX Mechanics
   voidOrb?: VoidOrb;
 
@@ -190,4 +204,7 @@ export interface GameState {
   // Time Control
   slowMoFactor: number; // 1.0 = normal, 0.5 = slow
   slowMoTimer: number; // How long to stay in slow mo
+  
+  // Game Feel
+  hitStop: number; // Frames to freeze logic for impact
 }

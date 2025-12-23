@@ -62,3 +62,27 @@ export const createShockwave = (gameState: GameState, x: number, y: number, colo
       alpha: 1
   });
 };
+
+export const createLightningBolt = (gameState: GameState, x: number, y: number) => {
+    // Vertical Thunder Strike
+    // Spawns particles in a column to simulate a lightning bolt striking down
+    for (let i = 0; i < 15; i++) {
+        // Vertical spread
+        const py = y - (i * 40); 
+        gameState.particles.push({
+            id: Math.random().toString(),
+            x: x + (Math.random() - 0.5) * 30, // Slight horizontal jitter
+            y: py,
+            vx: (Math.random() - 0.5) * 2,
+            vy: 5 + Math.random() * 10, // Downward velocity
+            life: 15 + Math.random() * 10,
+            maxLife: 25,
+            color: '#06b6d4', // Cyan
+            size: 4 + Math.random() * 6
+        });
+    }
+    
+    // Impact ring at the bottom
+    createShockwave(gameState, x, y, '#ffffff');
+    createParticles(gameState, x, y, 10, '#ffffff', 8);
+};

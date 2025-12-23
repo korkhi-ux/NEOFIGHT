@@ -12,9 +12,9 @@ export const updateKinetic = (
     audio?: AudioManager
 ) => {
     // 1. VELOCITY CONVERTER
-    // Capped at 2.5x max multiplier
+    // Formula: 1.0 + (Speed / 40). Uncapped for maximum kinetic potential.
     const currentSpeed = Math.sqrt(f.vx*f.vx + f.vy*f.vy);
-    f.dynamicDamageMult = Math.min(2.5, 1.0 + (currentSpeed / 40));
+    f.dynamicDamageMult = 1.0 + (currentSpeed / 40);
 
     // 2. SPECIAL: BLAST ENGINE
     if (freshSpecial && f.grappleCooldownTimer <= 0 && !f.isDiving) {
@@ -54,24 +54,19 @@ export const updateKinetic = (
              const dist = Math.sqrt(Math.pow((f.x + f.width/2) - (opponent.x + opponent.width/2), 2) + Math.pow((f.y + f.height) - (opponent.y + opponent.height), 2));
              
              if (dist < 250) {
-                 // Nerfed Base Damage to 12.
-                 // With max speed multiplier (~2.0x), max damage is ~24-25. Strong but fair.
+                 // Base Damage set to 12 as requested.
                  const diveDamage = 12 * (f.dynamicDamageMult ?? 1.0);
                  opponent.health -= diveDamage;
                  opponent.vx = Math.sign(opponent.x - f.x) * 20;
                  opponent.vy = -10;
                  opponent.hitFlashTimer = 5;
                  
-                 // Shake Feedback logic handles visuals in collisionSystem generally, 
-                 // but for this specific special move we add extra flair if it hits hard.
                  if (diveDamage > 25) {
                      gameState.shake += 15;
                      audio?.playHit(true);
                  } else {
                      audio?.playHit(false);
                  }
-                 
-                 // Note: Death logic is now handled by the Global Death Check in collisionSystem.ts
              }
              audio?.playHit(true); 
          }

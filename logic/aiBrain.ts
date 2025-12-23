@@ -191,9 +191,14 @@ export const updateAI = (enemy: Fighter, player: Fighter, gameState: GameState):
     const timeScale = gameState.slowMoFactor;
     const dx = player.x - enemy.x;
     const dist = Math.abs(dx);
+    
+    // --- HUMAN ERROR FACTOR ---
+    // Expert (1.0) has 5% error rate, Easy (0.0) has 20% error rate.
+    const errorChance = 0.20 - (ai.difficulty * 0.15); 
 
     // --- 1. KILL MODE (Zero Latency CQC) ---
     // If the enemy is in your face, NO HESITATION. Frame 1 decisions.
+    // However, we introduce a tiny confusion chance even here for "whiffing".
     if (dist < ATTACK_RANGE + 20) {
         ai.actionTimer = 0;
         ai.reactionCooldown = 0;
@@ -241,28 +246,52 @@ export const updateAI = (enemy: Fighter, player: Fighter, gameState: GameState):
     // Get Class Specific Strategy
     const inputs = getClassAction(enemy, player, dist, dx, gameState);
 
-    // --- 5. GLOBAL AGGRESSION OVERRIDE ---
-    // Priority Rule: If in range, 95% chance to mash attack.
-    if (dist < ATTACK_RANGE) {
+    // --- 5. GLOBAL AGGRESSION & WHIFFING LOGIC ---
+    // Priority Rule: If in range, high chance to attack.
+    // HUMANIZER: We artificially extend the attack range by random amount to simulate bad spacing (whiffing)
+    const whiffRange = ATTACK_RANGE + (Math.random() * 80 * errorChance); // Can overshoot by up to 80px on low difficulty
+    
+    if (dist < whiffRange) {
+        // 95% chance to mash attack if perceived in range
         if (chance(0.95)) {
             inputs.attack = true;
         }
     }
 
-    // --- 6. COMBO CHAINING ---
+    // --- 6. MOVEMENT MIS-INPUT (Panic Dash) ---
+    // HUMANIZER: Chance to dash in the wrong direction
+    if (inputs.dash) {
+        // If we trigger the error chance, flip the X input or dash randomly
+        if (chance(errorChance * 0.5)) { // 5-10% chance
+            inputs.x = -inputs.x; // Dash backwards/wrong way
+        }
+    }
+
+    // --- 7. SPECIAL MOVE HESITATION ---
+    // HUMANIZER: If logic says "Special", we roll a confidence check.
+    // If failed, we don't fire THIS frame. Since this runs every frame, 
+    // it effectively creates a variable delay (Hesitation) before execution.
+    if (inputs.special) {
+        // 15% chance to hesitate per frame
+        if (chance(0.15)) {
+            inputs.special = false;
+        }
+    }
+
+    // --- 8. COMBO CHAINING ---
     // If currently attacking, try to queue next hit
     if (enemy.isAttacking && enemy.comboCount < 2) {
         if (dist < ATTACK_RANGE + 50) inputs.attack = true;
     }
 
-    // --- 7. RECOVERY MANAGEMENT ---
+    // --- 9. RECOVERY MANAGEMENT ---
     // If we just whiffed a big combo, maybe pause briefly (unless Volt/High Diff)
     if (enemy.attackCooldown > 0 && ai.difficulty < 0.7) {
         inputs.attack = false;
         if (chance(0.5)) inputs.x = -Math.sign(dx); // Back off
     }
 
-    // --- 8. COMMIT & RETURN ---
+    // --- 10. COMMIT & RETURN ---
     // Randomize hold time slightly (5-15 frames) to feel organic
     ai.actionTimer = 5 + Math.random() * 10;
     ai.nextMove = inputs;
