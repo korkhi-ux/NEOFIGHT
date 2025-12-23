@@ -71,11 +71,7 @@ export const updateKinetic = (
                      audio?.playHit(false);
                  }
                  
-                 if (opponent.health <= 0) {
-                     opponent.isDead = true; 
-                     gameState.winner = f.id;
-                     audio?.playKO();
-                 }
+                 // Note: Death logic is now handled by the Global Death Check in collisionSystem.ts
              }
              audio?.playHit(true); 
          }

@@ -5,6 +5,38 @@ import { Fighter, GameState } from '../types';
 import { AudioManager } from '../core/AudioManager';
 import { createImpact, createParticles, createShockwave, createFlare } from './effectSpawners';
 
+// --- CENTRALIZED DEATH LOGIC (THE ARBITER) ---
+const triggerDeath = (
+    victim: Fighter, 
+    killer: Fighter, 
+    gameState: GameState, 
+    audio: AudioManager | null, 
+    onGameOver: (winner: 'player' | 'enemy', pScore: number, eScore: number) => void
+) => {
+    if (victim.isDead) return; // Prevent double trigger
+
+    victim.isDead = true;
+    victim.health = 0;
+    killer.score += 1;
+    gameState.winner = killer.id;
+    
+    // Dramatic Finish Effects
+    gameState.slowMoFactor = 0.1; 
+    gameState.slowMoTimer = 180; 
+    
+    const impactX = victim.x + victim.width / 2;
+    const impactY = victim.y + victim.height / 2;
+    createFlare(gameState, impactX, impactY, '#ffffff');
+    
+    audio?.playKO();
+
+    // Determine current scores directly from state (killer score was just incremented)
+    const pScore = gameState.player.score;
+    const eScore = gameState.enemy.score;
+
+    setTimeout(() => onGameOver(gameState.winner!, pScore, eScore), 3000); 
+};
+
 export const checkCollisions = (
     gameState: GameState, 
     audio: AudioManager | null, 
@@ -69,8 +101,19 @@ export const checkCollisions = (
       }
     };
 
+    // Run Standard Collision Checks
     checkHit(player, enemy);
     checkHit(enemy, player);
+
+    // --- GLOBAL DEATH CHECK (Catch-all) ---
+    // Catches deaths from Special Abilities (Orb, Dive), DoTs, or Traps
+    // that happen outside the standard handleHit function.
+    if (player.health <= 0 && !player.isDead) {
+        triggerDeath(player, enemy, gameState, audio, onGameOver);
+    }
+    if (enemy.health <= 0 && !enemy.isDead) {
+        triggerDeath(enemy, player, gameState, audio, onGameOver);
+    }
 };
 
 const handleHit = (
@@ -158,22 +201,9 @@ const handleHit = (
     createParticles(gameState, impactX, impactY, 10, attacker.color.glow, 15);
     createShockwave(gameState, impactX, impactY, attacker.color.glow);
 
-    // --- GAME OVER ---
+    // --- IMMEDIATE DEATH CHECK (Optional optimization) ---
+    // We check here for immediate feedback, but the Global Check in checkCollisions is the fallback.
     if (defender.health <= 0 && !defender.isDead) {
-        defender.isDead = true;
-        defender.health = 0;
-        attacker.score += 1;
-        gameState.winner = attacker.id;
-        
-        gameState.slowMoFactor = 0.1; 
-        gameState.slowMoTimer = 180; 
-        createFlare(gameState, impactX, impactY, '#ffffff');
-        
-        audio?.playKO();
-
-        const pScore = (attacker.id === 'player' ? attacker.score : defender.score);
-        const eScore = (attacker.id === 'enemy' ? attacker.score : defender.score);
-
-        setTimeout(() => onGameOver(attacker.id, pScore, eScore), 3000); 
+        triggerDeath(defender, attacker, gameState, audio, onGameOver);
     }
 };
