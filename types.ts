@@ -197,8 +197,9 @@ export interface GameState {
   cameraLookAhead: number;
   cameraTilt: number;
 
-  matchState: 'intro' | 'fight' | 'gameover'; // Added Phase control
-  introTimer: number; // Countdown for intro animations
+  matchState: 'intro' | 'fight' | 'gameover'; 
+  introTimer: number; // Countdown for intro animations (Starts at 300)
+  introStep: 'p1' | 'p2' | 'both'; // Controls cinematic focus
 
   winner: 'player' | 'enemy' | null;
   gameActive: boolean;

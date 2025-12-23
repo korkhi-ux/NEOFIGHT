@@ -111,6 +111,7 @@ export const useGameLoop = (
         cameraTilt: 0,
         matchState: 'intro',
         introTimer: INTRO_DURATION,
+        introStep: 'p1', // Initialize step
         winner: null,
         gameActive: false,
         frameCount: 0,
@@ -148,7 +149,8 @@ export const useGameLoop = (
             impacts: [],
             flares: [],
             matchState: 'intro',
-            introTimer: INTRO_DURATION
+            introTimer: INTRO_DURATION,
+            introStep: 'p1' // Reset step
         };
 
         let animationFrameId: number;

@@ -8,12 +8,77 @@ const lerp = (start: number, end: number, t: number) => {
 };
 
 export const updateCamera = (gameState: GameState, viewportWidth: number, viewportHeight: number) => {
-    const { player, enemy, shake } = gameState;
+    const { player, enemy, shake, matchState, introStep } = gameState;
 
-    // --- 0. STATE ANALYSIS ---
+    // --- 0. INTRO CINEMATIC OVERRIDE ---
+    if (matchState === 'intro') {
+        let targetSubject = player;
+        let targetZoom = 1.3;
+        let lerpSpeed = 0.05;
+
+        // Determine Subject & Zoom based on step
+        if (introStep === 'p1') {
+            targetSubject = player;
+            targetZoom = 1.5;
+            lerpSpeed = 0.08;
+        } else if (introStep === 'p2') {
+            targetSubject = enemy;
+            targetZoom = 1.5;
+            lerpSpeed = 0.08;
+        } else {
+            // "Both" - Center frame
+            const midX = (player.x + enemy.x + player.width + enemy.width) / 2;
+            // Create a virtual target in the middle
+            targetSubject = { ...player, x: midX - player.width/2 }; 
+            targetZoom = 1.1; // Wider shot for the face-off
+            lerpSpeed = 0.03;
+        }
+
+        const viewW = viewportWidth / targetZoom;
+        const viewH = viewportHeight / targetZoom;
+
+        // --- CAMERA POSITIONING ---
+        // X: Center on the subject
+        const targetX = (targetSubject.x + targetSubject.width/2) - (viewW / 2);
+        
+        let targetY = 0;
+
+        // Y: DYNAMIC TRACKING VS GROUND LOCK
+        // Slinger and Kinetic drop from the sky, so we want to track their descent.
+        // Volt and Vortex appear on the ground (or teleport in), so we frame the stage.
+        const isAerialEntry = (introStep === 'p1' || introStep === 'p2') && 
+                              (targetSubject.classType === 'KINETIC' || targetSubject.classType === 'SLINGER');
+
+        if (isAerialEntry) {
+            // Track the falling character center
+            const charCenterY = targetSubject.y + targetSubject.height / 2;
+            targetY = charCenterY - (viewH / 2);
+
+            // Clamp bottom so we don't look underground when they land.
+            // We calculate the "Stage Frame" Y position and ensure we don't go below it.
+            const standingY = GROUND_Y - targetSubject.height;
+            const floorLimitY = (standingY + targetSubject.height * 0.4) - (viewH / 2);
+            
+            // Allow tracking high up (negative values), but cap the descent at the floor limit
+            targetY = Math.min(targetY, floorLimitY);
+        } else {
+            // Ground Lock for Volt/Vortex/Face-off
+            // We frame the "Stage" so we see them land/spawn into the frame.
+            const standingY = GROUND_Y - targetSubject.height;
+            targetY = (standingY + targetSubject.height * 0.4) - (viewH / 2);
+        }
+
+        gameState.cameraZoom = lerp(gameState.cameraZoom, targetZoom, lerpSpeed);
+        gameState.cameraX = lerp(gameState.cameraX, targetX, lerpSpeed);
+        gameState.cameraY = lerp(gameState.cameraY, targetY, lerpSpeed);
+        gameState.cameraTilt = lerp(gameState.cameraTilt, 0, 0.05);
+        return;
+    }
+
+
+    // --- 1. STANDARD COMBAT CAMERA ---
     const isHighSpeed = Math.abs(player.vx) > 15 || Math.abs(player.vy) > 15 || player.isGrappling || player.isDashing;
 
-    // --- 1. TARGET FOCUS (Bounding Box) ---
     const minX = Math.min(player.x, enemy.x);
     const maxX = Math.max(player.x + player.width, enemy.x + enemy.width);
     const minY = Math.min(player.y, enemy.y);
@@ -23,104 +88,54 @@ export const updateCamera = (gameState: GameState, viewportWidth: number, viewpo
     const distX = maxX - minX;
     const distY = maxY - minY;
 
-    // --- 2. ZOOM LOGIC (Zone-based & Hysteresis) ---
-    // Zone 1: Close Combat (< 350px) -> Tight Zoom
-    // Zone 2: Mid Range -> Adaptive
-    // Zone 3: Far / High Speed -> Wide Zoom (MIN_ZOOM tendency)
-    
-    let paddingX = 450; // Default Mid-range padding
+    // --- ZOOM LOGIC ---
+    let paddingX = 450; 
+    if (isHighSpeed) paddingX = 650; 
+    else if (distX < 350) paddingX = 250; 
+    else if (distX > 900) paddingX = 550; 
 
-    if (isHighSpeed) {
-        paddingX = 650; // Open up view for speed
-    } else if (distX < 350) {
-        paddingX = 250; // Intimacy for melee
-    } else if (distX > 900) {
-        paddingX = 550; // Maintain context at distance
-    }
-
-    const paddingY = 300; // Vertical breathing room
+    const paddingY = 300; 
 
     const idealZoomX = viewportWidth / (distX + paddingX);
     const idealZoomY = viewportHeight / (distY + paddingY);
-    
-    // Choose the zoom that fits both dimensions
     let targetZoom = Math.min(idealZoomX, idealZoomY);
-
-    // Hard Clamps
     targetZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, targetZoom));
 
-    // Impact Shake Zoom Effect
     if (shake > 5) targetZoom += 0.05;
+    if (!isHighSpeed && Math.abs(targetZoom - gameState.cameraZoom) < 0.01) targetZoom = gameState.cameraZoom;
 
-    // Hysteresis: Prevent micro-jitter when near threshold
-    // If the difference is small, stick to current zoom unless moving fast
-    if (!isHighSpeed && Math.abs(targetZoom - gameState.cameraZoom) < 0.01) {
-        targetZoom = gameState.cameraZoom;
-    }
-
-    // Interpolation Speed
-    // Snappy on high energy/dash/grapple, smooth on stable movement
     const zoomSpeed = (isHighSpeed || Math.abs(player.vx) > 12) ? 0.15 : 0.02;
     gameState.cameraZoom = lerp(gameState.cameraZoom, targetZoom, zoomSpeed);
 
-    // --- 3. HORIZONTAL POSITIONING (Predictive Look-ahead) ---
+    // --- POSITIONING ---
     const viewW = viewportWidth / gameState.cameraZoom;
-    
-    // Predictive Look-ahead based on player velocity
-    // Helps player see where they are going
     const lookAheadFactor = 15;
     const maxLookAhead = 100;
     const lookAhead = Math.max(-maxLookAhead, Math.min(maxLookAhead, player.vx * lookAheadFactor));
     
     let targetCamX = (midX + lookAhead) - (viewW / 2);
-    
-    // Map Constraints (Clamp to World)
     targetCamX = Math.max(0, Math.min(targetCamX, WORLD_WIDTH - viewW));
 
-
-    // --- 4. VERTICAL POSITIONING (Robust Ground Anchor) ---
     const viewH = viewportHeight / gameState.cameraZoom;
-
-    // Anchor Position: Ground is at 80% of screen height (bottom 20% margin)
-    // This keeps the floor stable and visible.
     const anchorY = GROUND_Y - (viewH * 0.8);
-
-    // Lift Threshold: Camera only rises if highest player is significantly above ground
-    // e.g., > 350px above ground
     const liftThreshold = GROUND_Y - 350;
-    
     let targetCamY = anchorY;
 
-    // If highest player (minY) is above the threshold (numerically smaller)
     if (minY < liftThreshold) {
-         // Track the player, keeping them roughly at 25% from top of screen
          const trackingY = minY - (viewH * 0.25);
-         
-         // Use the higher value (numerically smaller Y) between anchor and tracking
-         // This allows the camera to lift up
          targetCamY = Math.min(anchorY, trackingY);
     }
     
-    // Floor Clamp: Prevent looking too deep underground
     const maxCamY = GROUND_Y + 150 - viewH;
     targetCamY = Math.min(targetCamY, maxCamY);
-    
-    // Ceiling Clamp
-    targetCamY = Math.max(targetCamY, -WORLD_WIDTH); // Arbitrary sky limit
+    targetCamY = Math.max(targetCamY, -WORLD_WIDTH); 
 
-    // Vertical Smoothing
-    // Very slow smoothing for stability, preventing nausea during jumps
     const verticalLerp = 0.03; 
-    
-    // Horizontal Smoothing
-    // Faster to track dashes
     const horizontalLerp = isHighSpeed ? 0.2 : 0.08;
 
     gameState.cameraX = lerp(gameState.cameraX, targetCamX, horizontalLerp);
     gameState.cameraY = lerp(gameState.cameraY, targetCamY, verticalLerp);
 
-    // --- 5. TILT DYNAMICS ---
-    // Tilt only on horizontal movement
     let targetTilt = 0;
     if (Math.abs(player.vx) > 10) {
         targetTilt = (player.vx / MAX_SPEED) * CAMERA_TILT_MAX;
