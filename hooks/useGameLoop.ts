@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import { GameState, Fighter, FighterClass } from '../types';
 import { COLORS } from '../config/colors';
@@ -15,18 +14,15 @@ import { renderGame } from '../rendering/gameRenderer';
 const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClass = 'VOLT'): Fighter => {
   const stats = CLASS_STATS[classType];
   
-  // Dynamic color assignment based on class string
+  // --- COLOR LOGIC FIX ---
+  // Strictly use the class color for identity consistency.
+  // Kinetic is always Orange, Volt is always Cyan, etc.
   const classKey = classType.toLowerCase() as keyof typeof COLORS;
-  const retrievedColor = COLORS[classKey];
+  const targetColor = COLORS[classKey] as { primary: string; secondary: string; glow: string; };
   
-  // Default to player or enemy theme
-  let colorSet = (id === 'player' ? COLORS.player : COLORS.enemy);
+  // Fallback to Volt colors if something goes wrong, but never generic 'enemy' purple unless the class is unknown
+  const finalColor = targetColor || COLORS.volt;
 
-  // If player, try to use specific class color if valid
-  if (id === 'player' && typeof retrievedColor === 'object' && retrievedColor && 'primary' in retrievedColor) {
-      colorSet = retrievedColor as { primary: string; secondary: string; glow: string; };
-  }
-  
   return {
     id,
     classType,
@@ -92,7 +88,7 @@ const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClas
     scaleX: 1,
     scaleY: 1,
     rotation: 0,
-    color: colorSet,
+    color: finalColor, // Applied specific class color
     score: 0
   };
 };
@@ -239,7 +235,7 @@ export const useGameLoop = (
             inputManager.current.unmount();
             audioManager.current?.suspend();
         };
-    }, [gameActive, onGameOver, playerClass, enemyClass]); // Removed isPaused from dependency array to prevent restart
+    }, [gameActive, onGameOver, playerClass, enemyClass]);
 
     return gameState;
 };

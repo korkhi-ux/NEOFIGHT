@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { GameState } from '../types';
+import { GameState, FighterClass } from '../types';
 import { COLORS } from '../config/colors';
 
 interface HUDProps {
@@ -22,29 +22,32 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive }) => {
     const comboContainerRef = useRef<HTMLDivElement>(null);
     const comboTextRef = useRef<HTMLSpanElement>(null);
 
-    // State to force render for initial names/colors
+    // Initial state setup
     const [hudState, setHudState] = useState({
         pName: 'VOLT', eName: 'KINETIC',
         pScore: 0, eScore: 0,
         pColor: COLORS.volt, eColor: COLORS.kinetic
     });
 
+    // Helper to extract strict class color
+    const getBarColor = (classType: FighterClass) => {
+        const key = classType.toLowerCase() as keyof typeof COLORS;
+        return (COLORS as any)[key] || COLORS.volt;
+    };
+
     useEffect(() => {
         if (!gameActive) return;
 
-        // Initialize HUD with correct classes
+        // Initialize HUD with correct class info from the game state
         const { player, enemy } = gameStateRef.current;
-        const pClassKey = player.classType.toLowerCase() as keyof typeof COLORS;
-        const eClassKey = enemy.classType.toLowerCase() as keyof typeof COLORS;
-        const pColor = (COLORS as any)[pClassKey] || COLORS.player;
-        const eColor = (COLORS as any)[eClassKey] || COLORS.enemy;
-
+        
         setHudState({
             pName: player.classType,
             eName: enemy.classType,
             pScore: player.score,
             eScore: enemy.score,
-            pColor, eColor
+            pColor: getBarColor(player.classType),
+            eColor: getBarColor(enemy.classType)
         });
 
         const uiLoop = () => {
@@ -66,7 +69,6 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive }) => {
             if (hpEnemyGhostRef.current) hpEnemyGhostRef.current.style.width = `${Math.max(0, eGhostPct)}%`;
 
             // Special Bar Logic (Approximate visualization)
-            // Assumes max cooldown ~100 frames for full bar representation
             const pSpecialPct = Math.max(0, 100 - (player.grappleCooldownTimer * 1.5));
             const eSpecialPct = Math.max(0, 100 - (enemy.grappleCooldownTimer * 1.5));
             
@@ -116,24 +118,35 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive }) => {
                 {/* PLAYER HUD */}
                 <div className="w-[42%] flex flex-col items-start gap-1">
                     <div className="flex items-end gap-2 mb-1 pl-4">
-                        <span className="text-4xl font-black italic text-white/90 drop-shadow-[0_0_10px_rgba(255,255,255,0.5)] tracking-tighter">
+                        <span 
+                            className="text-4xl font-black italic drop-shadow-[0_0_10px_rgba(255,255,255,0.5)] tracking-tighter"
+                            style={{ color: hudState.pColor.primary }}
+                        >
                             {hudState.pName}
                         </span>
-                        <div className="text-xs font-mono text-cyan-400 mb-1 px-2 py-0.5 border border-cyan-400/30 bg-cyan-900/20 rounded">
+                        <div 
+                            className="text-xs font-mono mb-1 px-2 py-0.5 border rounded"
+                            style={{ 
+                                color: hudState.pColor.glow, 
+                                borderColor: hudState.pColor.secondary,
+                                backgroundColor: 'rgba(0,0,0,0.5)' 
+                            }}
+                        >
                             PLAYER 1
                         </div>
                     </div>
 
                     {/* Health Bar Container */}
-                    <div ref={hpContainerPlayerRef} className="w-full h-8 bg-gray-900/80 border-2 border-cyan-500/50 relative overflow-hidden backdrop-blur-md shadow-[0_0_20px_rgba(0,0,0,0.5)]" style={{ transform: 'skewX(-20deg)' }}>
+                    <div ref={hpContainerPlayerRef} className="w-full h-8 bg-gray-900/80 border-2 border-white/10 relative overflow-hidden backdrop-blur-md shadow-[0_0_20px_rgba(0,0,0,0.5)]" style={{ transform: 'skewX(-20deg)' }}>
                          {/* Ghost Bar */}
                          <div ref={hpPlayerGhostRef} className="absolute h-full bg-white transition-all duration-300 ease-out" style={{ width: '100%', opacity: 0.7 }}></div>
                          {/* Main HP Bar */}
-                         <div ref={hpPlayerRef} className="absolute h-full transition-all duration-75 ease-out shadow-[0_0_15px_currentColor]" 
+                         <div ref={hpPlayerRef} className="absolute h-full transition-all duration-75 ease-out" 
                               style={{ 
                                   width: '100%', 
                                   backgroundColor: hudState.pColor.primary,
-                                  background: `linear-gradient(90deg, ${hudState.pColor.secondary} 0%, ${hudState.pColor.primary} 60%, white 100%)`
+                                  background: `linear-gradient(90deg, ${hudState.pColor.secondary} 0%, ${hudState.pColor.primary} 60%, white 100%)`,
+                                  boxShadow: `0 0 10px ${hudState.pColor.primary}`
                               }}>
                          </div>
                     </div>
@@ -146,12 +159,12 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive }) => {
 
                 {/* CENTER SCORE HEXAGON */}
                 <div className="absolute left-1/2 -translate-x-1/2 top-0 flex flex-col items-center">
-                     <div className="w-24 h-20 bg-black/80 border-2 border-cyan-500/50 flex items-center justify-center relative backdrop-blur-sm" 
+                     <div className="w-24 h-20 bg-black/80 border-2 border-white/20 flex items-center justify-center relative backdrop-blur-sm" 
                           style={{ clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' }}>
-                        <div className="flex gap-4 text-3xl font-black italic text-white drop-shadow-[0_0_5px_cyan]">
-                            <span className="text-cyan-400">{hudState.pScore}</span>
+                        <div className="flex gap-4 text-3xl font-black italic text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">
+                            <span style={{ color: hudState.pColor.primary }}>{hudState.pScore}</span>
                             <span className="text-white/20">-</span>
-                            <span className="text-red-500">{hudState.eScore}</span>
+                            <span style={{ color: hudState.eColor.primary }}>{hudState.eScore}</span>
                         </div>
                      </div>
                      <div className="text-[10px] tracking-[0.5em] text-white/40 mt-1 font-mono">VS</div>
@@ -160,24 +173,35 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive }) => {
                 {/* ENEMY HUD */}
                 <div className="w-[42%] flex flex-col items-end gap-1">
                     <div className="flex items-end gap-2 mb-1 pr-4">
-                        <div className="text-xs font-mono text-red-400 mb-1 px-2 py-0.5 border border-red-400/30 bg-red-900/20 rounded">
+                        <div 
+                            className="text-xs font-mono mb-1 px-2 py-0.5 border rounded"
+                            style={{ 
+                                color: hudState.eColor.glow, 
+                                borderColor: hudState.eColor.secondary,
+                                backgroundColor: 'rgba(0,0,0,0.5)' 
+                            }}
+                        >
                             CPU
                         </div>
-                        <span className="text-4xl font-black italic text-white/90 drop-shadow-[0_0_10px_rgba(255,255,255,0.5)] tracking-tighter">
+                        <span 
+                            className="text-4xl font-black italic drop-shadow-[0_0_10px_rgba(255,255,255,0.5)] tracking-tighter"
+                            style={{ color: hudState.eColor.primary }}
+                        >
                             {hudState.eName}
                         </span>
                     </div>
 
                     {/* Health Bar Container */}
-                    <div ref={hpContainerEnemyRef} className="w-full h-8 bg-gray-900/80 border-2 border-red-500/50 relative overflow-hidden backdrop-blur-md shadow-[0_0_20px_rgba(0,0,0,0.5)]" style={{ transform: 'skewX(20deg)' }}>
+                    <div ref={hpContainerEnemyRef} className="w-full h-8 bg-gray-900/80 border-2 border-white/10 relative overflow-hidden backdrop-blur-md shadow-[0_0_20px_rgba(0,0,0,0.5)]" style={{ transform: 'skewX(20deg)' }}>
                          {/* Ghost Bar */}
                          <div ref={hpEnemyGhostRef} className="absolute right-0 h-full bg-white transition-all duration-300 ease-out" style={{ width: '100%', opacity: 0.7 }}></div>
                          {/* Main HP Bar */}
-                         <div ref={hpEnemyRef} className="absolute right-0 h-full transition-all duration-75 ease-out shadow-[0_0_15px_currentColor]" 
+                         <div ref={hpEnemyRef} className="absolute right-0 h-full transition-all duration-75 ease-out" 
                               style={{ 
                                   width: '100%', 
                                   backgroundColor: hudState.eColor.primary,
-                                  background: `linear-gradient(-90deg, ${hudState.eColor.secondary} 0%, ${hudState.eColor.primary} 60%, white 100%)`
+                                  background: `linear-gradient(-90deg, ${hudState.eColor.secondary} 0%, ${hudState.eColor.primary} 60%, white 100%)`,
+                                  boxShadow: `0 0 10px ${hudState.eColor.primary}`
                               }}>
                          </div>
                     </div>
