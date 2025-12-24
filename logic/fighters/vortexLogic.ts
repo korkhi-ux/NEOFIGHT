@@ -1,6 +1,6 @@
 
 import { Fighter, GameState } from '../../types';
-import { createShockwave, createFlare, createImpact, createParticles } from '../effectSpawners';
+import { createShockwave, createFlare, createImpact, createParticles, createDamageText } from '../effectSpawners';
 import { AudioManager } from '../../core/AudioManager';
 import { WORLD_WIDTH } from '../../config/physics';
 
@@ -65,6 +65,7 @@ export const updateVortex = (
                 // Continuous Health Drain (No hitstun, just melting)
                 // 0.3 hp per frame ~ 18 DPS. Dangerous territory.
                 opponent.health -= 0.3 * timeScale;
+                opponent.lastDamageFrame = gameState.frameCount; // IMPORTANT: Stop regen
                 
                 // Slight suction on opponent
                 opponent.vx += ((centerX - oppCenterX) / distToOpp) * 0.5 * timeScale;
@@ -120,6 +121,12 @@ export const updateVortex = (
 
                 if (distToOpp < burstRadius) {
                     opponent.health -= 15; 
+                    opponent.lastDamageFrame = gameState.frameCount;
+                    
+                    if (gameState.gameMode === 'SANDBOX') {
+                        createDamageText(gameState, opponent.x + opponent.width/2, opponent.y, 15);
+                    }
+                    
                     opponent.hitFlashTimer = 10;
                     // Knockback away from center
                     const dx = oppCenterX - (f.x + f.width/2);

@@ -67,6 +67,7 @@ const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClas
     isAttacking: false,
     isStunned: false,
     isDead: false,
+    lastDamageFrame: 0,
     prevVx: 0,
     prevGrounded: false,
     trail: [],
@@ -263,14 +264,20 @@ export const useGameLoop = (
                             }
                         }
 
-                        // 2. SANDBOX MODE: INFINITE HP
+                        // 2. SANDBOX MODE: REGEN AFTER 5 SECONDS
                         if (state.gameMode === 'SANDBOX') {
-                            if (state.enemy.health < state.enemy.maxHealth) {
-                                state.enemy.health = state.enemy.maxHealth;
-                                state.enemy.ghostHealth = state.enemy.maxHealth;
+                            const timeSinceHit = state.frameCount - state.enemy.lastDamageFrame;
+
+                            // If more than 5 seconds (300 frames) since last hit
+                            if (timeSinceHit > 300 && state.enemy.health < state.enemy.maxHealth) {
+                                state.enemy.health += 2; // Fast regen
+                                if (state.enemy.health > state.enemy.maxHealth) state.enemy.health = state.enemy.maxHealth;
+                                state.enemy.ghostHealth = state.enemy.health; // Sync ghost bar
                             }
-                            // Prevent death logic
+
+                            // Prevent death
                             state.enemy.isDead = false; 
+                            if (state.enemy.health <= 0) state.enemy.health = 1;
                         }
                     }
 

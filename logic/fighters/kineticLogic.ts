@@ -1,6 +1,6 @@
 
 import { Fighter, GameState } from '../../types';
-import { createShockwave, createParticles } from '../effectSpawners';
+import { createShockwave, createParticles, createDamageText } from '../effectSpawners';
 import { AudioManager } from '../../core/AudioManager';
 import { GROUND_Y } from '../../config/physics';
 
@@ -57,6 +57,12 @@ export const updateKinetic = (
                  // Base Damage set to 12 as requested.
                  const diveDamage = 12 * (f.dynamicDamageMult ?? 1.0);
                  opponent.health -= diveDamage;
+                 opponent.lastDamageFrame = gameState.frameCount;
+                 
+                 if (gameState.gameMode === 'SANDBOX') {
+                     createDamageText(gameState, opponent.x + opponent.width/2, opponent.y, diveDamage);
+                 }
+
                  opponent.vx = Math.sign(opponent.x - f.x) * 20;
                  opponent.vy = -10;
                  opponent.hitFlashTimer = 5;

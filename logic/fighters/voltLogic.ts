@@ -1,6 +1,6 @@
 
 import { Fighter, GameState } from '../../types';
-import { createShockwave, createParticles, createImpact, createFlare, createLightningBolt } from '../effectSpawners';
+import { createShockwave, createParticles, createImpact, createFlare, createLightningBolt, createDamageText } from '../effectSpawners';
 import { AudioManager } from '../../core/AudioManager';
 import { WORLD_WIDTH } from '../../config/physics';
 
@@ -61,6 +61,11 @@ export const updateVolt = (
         if (horizontalHit && verticalHit) {
             // --- HIT CONFIRMED ---
             opponent.health -= 20;
+            opponent.lastDamageFrame = gameState.frameCount;
+
+            if (gameState.gameMode === 'SANDBOX') {
+                createDamageText(gameState, opponent.x + opponent.width/2, opponent.y, 20);
+            }
             
             // Stun effect (Freeze velocity)
             opponent.vx = 0;

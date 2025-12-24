@@ -124,6 +124,7 @@ export interface Fighter {
   isDashing: boolean;
   isAttacking: boolean;
   isDead: boolean;
+  lastDamageFrame: number; // FrameCount du dernier dégât subi
 
   // Combat State
   hasHit: boolean; // Prevents multi-frame hits per single attack swing

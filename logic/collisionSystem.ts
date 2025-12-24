@@ -137,6 +137,7 @@ const handleHit = (
     const impactY = defender.y + defender.height/2;
 
     defender.hitFlashTimer = HIT_FLASH_DURATION; 
+    defender.lastDamageFrame = gameState.frameCount; // TRACK DAMAGE TIME
     
     const dx = defender.x - attacker.x;
     const dy = defender.y - attacker.y;
