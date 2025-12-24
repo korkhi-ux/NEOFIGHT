@@ -60,8 +60,8 @@ export const updateVolt = (
 
         if (horizontalHit && verticalHit) {
             // --- HIT CONFIRMED ---
-            // BALANCING: Reduced from 20 to 18 (Precision Strike, not Heavy Hit)
-            const dmg = 18;
+            // BALANCING: Reduced from 20 to 15 (Precision Strike, not Heavy Hit)
+            const dmg = 15;
             opponent.health -= dmg;
             opponent.lastDamageFrame = gameState.frameCount;
 

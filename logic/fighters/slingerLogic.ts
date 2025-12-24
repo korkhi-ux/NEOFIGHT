@@ -26,8 +26,8 @@ export const updateSlinger = (
         if (overlap) {
             // 1. CALCULATE DAMAGE (Speed Based)
             const speed = Math.sqrt(f.vx*f.vx + f.vy*f.vy);
-            // Formula: Speed * 0.6, Hard Cap at 22
-            const damage = Math.min(22, Math.floor(speed * 0.6));
+            // Formula: Speed * 0.6, Hard Cap at 15
+            const damage = Math.min(15, Math.floor(speed * 0.6));
 
             opponent.health -= damage;
             opponent.lastDamageFrame = gameState.frameCount;
