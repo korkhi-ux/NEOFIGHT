@@ -14,103 +14,134 @@ export const updateKinetic = (
     const timeScale = gameState.slowMoFactor;
 
     // 1. VELOCITY CONVERTER (PASSIVE)
-    // Updates visual intensity based on current speed
+    // Visual feedback: Shows how much potential energy Kinetic currently has.
     const currentSpeed = Math.sqrt(f.vx*f.vx + f.vy*f.vy);
-    f.dynamicDamageMult = 1.0 + (currentSpeed / 30); // Scaled for visual feedback
+    f.dynamicDamageMult = 1.0 + (currentSpeed / 30); 
 
-    // 2. SPECIAL: BLAST ENGINE
+    // 2. SPECIAL ACTIVATION
     if (freshSpecial && f.grappleCooldownTimer <= 0 && !f.isDiving) {
         f.grappleCooldownTimer = 90;
         
         if (f.isGrounded) {
-             // BLAST JUMP (Ground Variant)
+             // --- VARIANT A: BLAST JUMP (Ground) ---
+             // Used for initiation / spacing. Fixed physics.
              f.vy = -28;
              f.vx = f.facing * 18;
              f.isGrounded = false;
              f.scaleX = 0.5; f.scaleY = 1.5; 
+             
+             // Reset Charge for ground jump (no run-up bonus yet)
+             f.specialPowerCharge = 10; 
+
              createShockwave(gameState, f.x + f.width/2, f.y + f.height, f.color.primary);
              createParticles(gameState, f.x + f.width/2, f.y + f.height, 15, '#fbbf24', 5);
              audio?.playDash();
         } 
         else {
-             // COMET DIVE (Air Variant) - PHASE 1: IGNITION
+             // --- VARIANT B: COMET DIVE (Air) ---
+             // PHILOSOPHY: "Snapshot Mechanics"
+             // Damage is determined by the MOMENTUM built up BEFORE activation.
+             
+             // 1. SNAPSHOT INERTIA
+             // Calculate total speed vector at the moment of button press.
+             // Running Jump (vx: ~20) -> High Charge.
+             // Standing Jump (vx: 0) -> Low Charge.
+             const entrySpeed = Math.sqrt(f.vx*f.vx + f.vy*f.vy);
+             f.specialPowerCharge = entrySpeed;
+
+             // 2. ACTIVATE STATE
              f.isDiving = true;
              
-             // Conserve momentum but ensure forward engagement
-             f.vx = f.facing * Math.max(12, Math.abs(f.vx)); 
+             // 3. PHYSICS APPLICATION
+             // DO NOT touch f.vx. We must preserve the run-up trajectory.
+             // Set downward thrust to start the "Engine".
+             f.vy = 10; 
              
-             // HEAVY START: Start slow, accelerate fast (Thrusters)
-             f.vy = 15; 
-             
+             // Visuals
              createParticles(gameState, f.x + f.width/2, f.y, 10, '#ffffff', 2);
-             // Initial "Pop"
              f.scaleY = 0.8; f.scaleX = 1.2;
              audio?.playDash();
         }
     }
 
-    // 3. COMET DIVE LOGIC
+    // 3. COMET DIVE FLIGHT LOOP
     if (f.isDiving) {
-         // PHASE 2: ACCELERATION (THRUSTERS)
-         // Apply Bonus Gravity to simulate jetpack propulsion downward
-         // Normal gravity is handled in fighterPhysics, but isDiving disables standard gravity there.
-         // We apply a stronger force here (+2.0 per frame is huge acceleration)
+         // --- GRAVITY ASSIST ---
+         // Apply Bonus Gravity to simulate thrusters pushing down.
+         // This adds the "Weight" to the impact (the 20% factor).
          f.vy += 2.0 * timeScale;
 
-         // Visuals: Trail Intensity increases with speed
+         // --- VISUALS ---
+         // Particle intensity is based on the STORED CHARGE, not just current speed.
+         // This tells the player "You are charged up!" even if falling slowly at start.
          if (gameState.frameCount % 2 === 0) {
-             createParticles(gameState, f.x + f.width/2, f.y, 2, f.color.glow, 4 + (f.vy / 10));
+             const chargeVisual = f.specialPowerCharge || 10;
+             createParticles(gameState, f.x + f.width/2, f.y, 2, f.color.glow, 4 + (chargeVisual / 5));
          }
 
-         // PHASE 3: IMPACT
+         // --- IMPACT LOGIC ---
          if (f.isGrounded || f.y >= GROUND_Y - f.height) {
              f.isDiving = false;
              
-             // CALCULATE KINETIC ENERGY
-             // Pythagorean theorem for total velocity at moment of impact
-             const impactSpeed = Math.sqrt(f.vx*f.vx + f.vy*f.vy);
+             // 1. GATHER DATA
+             // Calculate the speed at impact for the minor damage factor
+             const fallSpeed = Math.sqrt(f.vx*f.vx + f.vy*f.vy);
              
+             // Stop movement
              f.vx = 0;
-             f.vy = 0; // Stop
+             f.vy = 0; 
              
-             // --- DAMAGE FORMULA ---
-             // Min Speed (Spam): ~20 -> 8 Dmg
-             // Mid Speed (Jump): ~35 -> 18 Dmg
-             // Terminal Velocity (High fall): ~50+ -> 30 Dmg
-             const diveDamage = Math.floor(Math.min(30, Math.max(8, impactSpeed * 0.6)));
+             // 2. CALCULATE DAMAGES (The Formula)
+             // Damage = Base + (StoredInertia * 0.8) + (FallSpeed * 0.2)
+             // This heavily favors the Run-Up (StoredInertia).
+             const inertiaDamage = (f.specialPowerCharge || 0) * 0.8;
+             const gravityDamage = fallSpeed * 0.2;
+             
+             let totalDamage = 5 + inertiaDamage + gravityDamage;
+             
+             // Cap damage to prevent one-shots (Max ~35)
+             totalDamage = Math.floor(Math.min(35, Math.max(8, totalDamage)));
 
-             // Impact VFX
-             gameState.shake += Math.min(30, impactSpeed * 0.5); // Shake based on speed
+             // 3. IMPACT VFX
+             // Shake proportional to damage
+             gameState.shake += totalDamage; 
+             
              createShockwave(gameState, f.x + f.width/2, f.y + f.height, '#ffffff'); 
              createShockwave(gameState, f.x + f.width/2, f.y + f.height, f.color.primary);
              createParticles(gameState, f.x + f.width/2, f.y + f.height, 20, '#f97316', 10);
              
-             // Hit Detection
+             // 4. HIT DETECTION
              const dist = Math.sqrt(Math.pow((f.x + f.width/2) - (opponent.x + opponent.width/2), 2) + Math.pow((f.y + f.height) - (opponent.y + opponent.height), 2));
              
              if (dist < 250) {
-                 opponent.health -= diveDamage;
+                 opponent.health -= totalDamage;
                  opponent.lastDamageFrame = gameState.frameCount;
                  
                  // Show floating numbers in Sandbox
                  if (gameState.gameMode === 'SANDBOX') {
-                     createDamageText(gameState, opponent.x + opponent.width/2, opponent.y, diveDamage);
+                     createDamageText(gameState, opponent.x + opponent.width/2, opponent.y, totalDamage);
                  }
 
                  // Physics Reaction
-                 opponent.vx = Math.sign(opponent.x - f.x) * (15 + (diveDamage * 0.5));
+                 // Knockback scales with how hard the hit was
+                 opponent.vx = Math.sign(opponent.x - f.x) * (10 + (totalDamage * 0.5));
                  opponent.vy = -10;
                  opponent.hitFlashTimer = 5;
                  
-                 if (diveDamage >= 20) {
-                     audio?.playHit(true); // Heavy Hit Sound
+                 // Audio Feedback based on intensity
+                 if (totalDamage >= 25) {
+                     audio?.playHit(true); // CRITICAL SOUND
+                     createShockwave(gameState, f.x, f.y, f.color.glow); // Extra Ring
                  } else {
-                     audio?.playHit(false); // Weak Hit Sound
+                     audio?.playHit(false);
                  }
              } else {
-                 // Whiff sound (heavy thud)
+                 // Whiff (Heavy Thud)
                  audio?.playHit(true); 
              }
+             
+             // Reset Charge
+             f.specialPowerCharge = 0;
          }
     }
 
