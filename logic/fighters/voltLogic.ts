@@ -60,11 +60,13 @@ export const updateVolt = (
 
         if (horizontalHit && verticalHit) {
             // --- HIT CONFIRMED ---
-            opponent.health -= 20;
+            // BALANCING: Reduced from 20 to 18 (Precision Strike, not Heavy Hit)
+            const dmg = 18;
+            opponent.health -= dmg;
             opponent.lastDamageFrame = gameState.frameCount;
 
             if (gameState.gameMode === 'SANDBOX') {
-                createDamageText(gameState, opponent.x + opponent.width/2, opponent.y, 20);
+                createDamageText(gameState, opponent.x + opponent.width/2, opponent.y, dmg);
             }
             
             // Stun effect (Freeze velocity)

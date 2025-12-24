@@ -6,7 +6,7 @@ export const drawSlinger = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
     if (f.isGrappling && f.grapplePoint) {
         // Calculate relative coordinates
         const startX = 0; 
-        const startY = -f.height * 0.65; // Chest height (moved up from 0.45)
+        const startY = -f.height * 0.65; // Chest height
         
         // Reverse transform the target point into local space
         const dx = f.grapplePoint.x - (f.x + f.width/2);
@@ -29,6 +29,7 @@ export const drawSlinger = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
         const amplitude = 12 * tightness + 1; 
         const freq = gameState.frameCount * 0.8;
 
+        // Draw Rope
         for (let i = 0; i < segments; i++) {
             const t = i / segments; const tNext = (i + 1) / segments;
             const x1 = startX + (localEndX - startX) * t; const y1 = startY + (localEndY - startY) * t;
@@ -56,9 +57,41 @@ export const drawSlinger = (ctx: CanvasRenderingContext2D, f: Fighter, gameState
             }
         }
         
-        // Anchor point glow
-        ctx.fillStyle = coreColor; ctx.shadowBlur = 20; ctx.shadowColor = baseColor;
-        ctx.beginPath(); ctx.arc(localEndX, localEndY, 5 + Math.random() * 3, 0, Math.PI*2); ctx.fill();
+        // --- DRAW ANCHOR VISUAL ---
+        ctx.translate(localEndX, localEndY);
+        
+        // 1. Anchor Glow
+        ctx.fillStyle = coreColor; 
+        ctx.shadowBlur = 20; 
+        ctx.shadowColor = baseColor;
+        ctx.beginPath(); ctx.arc(0, 0, 6 + Math.random() * 3, 0, Math.PI*2); ctx.fill();
+
+        // 2. Rotating Cyber Claws
+        ctx.rotate(gameState.frameCount * 0.15); // Spin
+        ctx.strokeStyle = baseColor;
+        ctx.lineWidth = 3;
+        ctx.shadowBlur = 5;
+
+        // Draw 3 Claws
+        for(let k=0; k<3; k++) {
+            ctx.rotate((Math.PI * 2) / 3);
+            ctx.beginPath();
+            ctx.moveTo(8, 0);
+            ctx.lineTo(22, -8); // Hook shape
+            ctx.lineTo(18, 0);
+            ctx.stroke();
+        }
+
+        // 3. Locking Ring (Counter-rotating)
+        ctx.rotate(-gameState.frameCount * 0.3);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.arc(0, 0, 28, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
         ctx.restore();
     }
 

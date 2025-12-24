@@ -120,11 +120,13 @@ export const updateVortex = (
                 const distToOpp = Math.sqrt(Math.pow((f.x + f.width/2) - oppCenterX, 2) + Math.pow((f.y + f.height/2) - oppCenterY, 2));
 
                 if (distToOpp < burstRadius) {
-                    opponent.health -= 15; 
+                    // BALANCING: Buffed from 15 to 20 (High Risk/High Reward)
+                    const damage = 20;
+                    opponent.health -= damage; 
                     opponent.lastDamageFrame = gameState.frameCount;
                     
                     if (gameState.gameMode === 'SANDBOX') {
-                        createDamageText(gameState, opponent.x + opponent.width/2, opponent.y, 15);
+                        createDamageText(gameState, opponent.x + opponent.width/2, opponent.y, damage);
                     }
                     
                     opponent.hitFlashTimer = 10;

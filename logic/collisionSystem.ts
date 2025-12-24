@@ -72,33 +72,7 @@ export const checkCollisions = (
             }
         }
       }
-
-      // 2. SLINGER METEOR KICK (Collision Body Slam)
-      if (attacker.classType === 'SLINGER' && attacker.isGrappleAttacking) {
-          // Check simple body overlap
-          const overlap = (
-              attacker.x < defender.x + defender.width &&
-              attacker.x + attacker.width > defender.x &&
-              attacker.y < defender.y + defender.height &&
-              attacker.y + attacker.height > defender.y
-          );
-
-          if (overlap) {
-              handleHit(attacker, defender, gameState, audio, onGameOver, true); // true = forced critical
-              
-              // Slinger Specific Cleanup
-              attacker.isGrappleAttacking = false;
-              attacker.isGrappling = false;
-              attacker.grapplePoint = null;
-              attacker.grappleTargetId = null;
-              attacker.grappleCooldownTimer = 0; // RESET COOLDOWN (Reward)
-              
-              // Bounce Slinger back slightly
-              attacker.vx = -attacker.facing * 10;
-              attacker.vy = -15; 
-              gameState.shake += 10;
-          }
-      }
+      // 2. SLINGER METEOR KICK (LOGIC MOVED TO slingerLogic.ts)
     };
 
     // Run Standard Collision Checks

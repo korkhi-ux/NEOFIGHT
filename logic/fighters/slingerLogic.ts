@@ -1,6 +1,6 @@
 
 import { Fighter, GameState } from '../../types';
-import { createShockwave, createParticles } from '../effectSpawners';
+import { createShockwave, createParticles, createDamageText, createImpact, createFlare } from '../effectSpawners';
 import { GROUND_Y, WORLD_WIDTH, GRAPPLE_COOLDOWN, GRAPPLE_MAX_SPEED, GRAPPLE_RANGE } from '../../config/physics';
 
 const MISSED_COOLDOWN = 60; // Reduced penalty to encourage aggression
@@ -12,6 +12,84 @@ export const updateSlinger = (
     opponent: Fighter
 ) => {
     const timeScale = gameState.slowMoFactor;
+
+    // --- COLLISION LOGIC: METEOR KICK ---
+    // Moved from collisionSystem.ts to allow local velocity calculation and state reset
+    if (f.isGrappleAttacking) {
+        const overlap = (
+            f.x < opponent.x + opponent.width &&
+            f.x + f.width > opponent.x &&
+            f.y < opponent.y + opponent.height &&
+            f.y + f.height > opponent.y
+        );
+
+        if (overlap) {
+            // 1. CALCULATE DAMAGE (Speed Based)
+            const speed = Math.sqrt(f.vx*f.vx + f.vy*f.vy);
+            // Formula: Speed * 0.6, Hard Cap at 22
+            const damage = Math.min(22, Math.floor(speed * 0.6));
+
+            opponent.health -= damage;
+            opponent.lastDamageFrame = gameState.frameCount;
+            opponent.hitFlashTimer = 5;
+
+            const impactX = opponent.x + opponent.width/2;
+            const impactY = opponent.y + opponent.height/2;
+
+            // 2. VISUALS (ENHANCED)
+            if (gameState.gameMode === 'SANDBOX') {
+                createDamageText(gameState, impactX, opponent.y, damage);
+            }
+            
+            // Neon Green Sonic Boom
+            createShockwave(gameState, impactX, impactY, '#bef264'); // Lime Green
+            createShockwave(gameState, impactX, impactY, '#ffffff'); // Inner White
+
+            // Directional Debris (Sparks flying forward from impact)
+            const angle = Math.atan2(f.vy, f.vx);
+            for(let i=0; i<8; i++) {
+                const spread = (Math.random() - 0.5) * 1.5;
+                const particleSpeed = 10 + Math.random() * 10;
+                gameState.particles.push({
+                    id: Math.random().toString(),
+                    x: impactX, 
+                    y: impactY,
+                    vx: Math.cos(angle + spread) * particleSpeed,
+                    vy: Math.sin(angle + spread) * particleSpeed,
+                    life: 20 + Math.random() * 10,
+                    maxLife: 30,
+                    color: i % 2 === 0 ? '#bef264' : '#ffffff',
+                    size: 4 + Math.random() * 4
+                });
+            }
+
+            createImpact(gameState, impactX, impactY, f.color.glow);
+            createFlare(gameState, impactX, impactY, f.color.glow);
+            gameState.shake += damage * 0.8; // Heavy Shake
+
+            // 3. RECOIL & RESET (Reward)
+            f.isGrappling = false;
+            f.isGrappleAttacking = false;
+            f.grapplePoint = null;
+            f.grappleTargetId = null;
+            f.grappleCooldownTimer = 0; // INSTANT RESET REWARD
+            
+            // Bounce Back Physics
+            f.vx = -f.facing * 10;
+            f.vy = -15; // Pop up
+            
+            // Animation Squash (Heavy Impact Feel)
+            f.scaleX = 1.5; f.scaleY = 0.5;
+
+            // 4. OPPONENT PHYSICS
+            opponent.vx = f.facing * (10 + damage * 0.5);
+            opponent.vy = -5;
+            opponent.scaleX = 0.6; opponent.scaleY = 1.4; // Opponent squeezes
+
+            // Prevent further processing this frame
+            return;
+        }
+    }
 
     // 1. MANUAL RELEASE
     if (freshSpecial && f.isGrappling) {
