@@ -15,13 +15,13 @@ interface GameCanvasProps {
 
 export const GameCanvas: React.FC<GameCanvasProps> = ({ onGameOver, gameActive, isPaused, playerClass, enemyClass }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const gameStateRef = useGameLoop(canvasRef, gameActive, isPaused, onGameOver, playerClass, enemyClass);
+  const { gameState } = useGameLoop(canvasRef, onGameOver);
 
   return (
     <div className="relative w-full h-full flex items-center justify-center bg-black">
         {/* HUD receives explicit class props to ensure UI colors match selected characters */}
         <HUD 
-            gameStateRef={gameStateRef} 
+            gameStateRef={gameState} 
             gameActive={gameActive} 
             playerClass={playerClass}
             enemyClass={enemyClass}

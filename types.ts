@@ -63,7 +63,7 @@ export interface LensFlare {
 }
 
 export interface AIState {
-  mode: 'neutral' | 'aggressive' | 'defensive' | 'showoff';
+  mode: 'neutral' | 'aggressive' | 'defensive' | 'showoff' | 'dummy';
   actionTimer: number; // Frames to hold current decision
   reactionCooldown: number; // Artificial lag (Human reaction time)
   recoveryTimer: number; // Forced pause after combos
@@ -74,6 +74,7 @@ export interface AIState {
 
 // --- CLASS SYSTEM TYPES ---
 export type FighterClass = 'VOLT' | 'SLINGER' | 'VORTEX' | 'KINETIC';
+export type GameMode = 'VERSUS' | 'SURVIVAL' | 'SANDBOX';
 
 export interface VoidOrb {
   x: number;
@@ -211,4 +212,9 @@ export interface GameState {
   
   // Game Feel
   hitStop: number; // Frames to freeze logic for impact
+
+  // GAME MODES
+  gameMode: GameMode;
+  wave: number;
+  isMenuOpen: boolean;
 }

@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { GameState, FighterClass } from '../types';
+import { GameState, FighterClass, GameMode } from '../types';
 import { COLORS } from '../config/colors';
 
 interface HUDProps {
@@ -30,7 +30,9 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive, playerClass,
     const [hudState, setHudState] = useState({
         pName: 'VOLT', eName: 'KINETIC',
         pScore: 0, eScore: 0,
-        pColor: COLORS.volt, eColor: COLORS.kinetic
+        pColor: COLORS.volt, eColor: COLORS.kinetic,
+        gameMode: 'VERSUS' as GameMode,
+        wave: 1
     });
 
     const getBarColor = (classType: FighterClass) => {
@@ -39,15 +41,17 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive, playerClass,
     };
 
     useEffect(() => {
-        const { player, enemy } = gameStateRef.current;
+        const { player, enemy, gameMode, wave } = gameStateRef.current;
         
         setHudState({
-            pName: playerClass,
-            eName: enemyClass,
+            pName: player.classType,
+            eName: enemy.classType,
             pScore: player.score,
             eScore: enemy.score,
-            pColor: getBarColor(playerClass),
-            eColor: getBarColor(enemyClass)
+            pColor: getBarColor(player.classType),
+            eColor: getBarColor(enemy.classType),
+            gameMode,
+            wave
         });
 
         if (!gameActive) return;
@@ -55,29 +59,29 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive, playerClass,
         const uiLoop = () => {
             if (!gameStateRef.current.gameActive) return;
 
-            const { player, enemy, matchState, introTimer } = gameStateRef.current;
-
+            const { player, enemy, matchState, introTimer, gameMode, wave } = gameStateRef.current;
+            
+            // Sync React State occasionally (or directly manipulate DOM for performance, mostly done below)
+            // Ideally we stick to DOM manipulation for the loop and State for initialization/major changes
+            
             // --- OVERLAY TEXT LOGIC ---
             if (overlayTextRef.current) {
                 if (matchState === 'intro') {
                     if (introTimer > 40) {
-                        overlayTextRef.current.innerText = "READY";
+                        overlayTextRef.current.innerText = gameMode === 'SURVIVAL' && wave > 1 ? `WAVE ${wave}` : "READY";
                         overlayTextRef.current.style.opacity = '1';
                         overlayTextRef.current.style.transform = 'scale(1)';
                         overlayTextRef.current.style.color = '#fbbf24'; // Amber
                     } else {
-                        // Anticipation
                          overlayTextRef.current.style.opacity = '0';
                          overlayTextRef.current.style.transform = 'scale(0.5)';
                     }
                 } else if (matchState === 'fight' && introTimer > -60) {
-                     // The first second of the fight
                      overlayTextRef.current.innerText = "FIGHT";
                      overlayTextRef.current.style.opacity = '1';
                      overlayTextRef.current.style.transform = 'scale(1.5)';
                      overlayTextRef.current.style.color = '#ef4444'; // Red
-                     // Fade out logic handled by CSS or frame decrement implied
-                     gameStateRef.current.introTimer--; // Hack to keep counting down for UI
+                     gameStateRef.current.introTimer--; 
                 } else {
                     overlayTextRef.current.style.opacity = '0';
                 }
@@ -95,6 +99,8 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive, playerClass,
 
             if (hpPlayerRef.current) hpPlayerRef.current.style.width = `${Math.max(0, pHealthPct)}%`;
             if (hpPlayerGhostRef.current) hpPlayerGhostRef.current.style.width = `${Math.max(0, pGhostPct)}%`;
+            
+            // In Sandbox, enemy health bar can be full always visually or grayed out
             if (hpEnemyRef.current) hpEnemyRef.current.style.width = `${Math.max(0, eHealthPct)}%`;
             if (hpEnemyGhostRef.current) hpEnemyGhostRef.current.style.width = `${Math.max(0, eGhostPct)}%`;
 
@@ -160,7 +166,7 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive, playerClass,
                                 backgroundColor: 'rgba(0,0,0,0.5)' 
                             }}
                         >
-                            PLAYER 1
+                            P1
                         </div>
                     </div>
 
@@ -180,21 +186,34 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive, playerClass,
                     </div>
                 </div>
 
-                {/* CENTER SCORE */}
+                {/* CENTER INFO BOX */}
                 <div className="absolute left-1/2 -translate-x-1/2 top-0 flex flex-col items-center">
-                     <div className="w-24 h-20 bg-black/80 border-2 border-white/20 flex items-center justify-center relative backdrop-blur-sm" 
+                     <div className="w-32 h-20 bg-black/80 border-2 border-white/20 flex items-center justify-center relative backdrop-blur-sm" 
                           style={{ clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' }}>
-                        <div className="flex gap-4 text-3xl font-black italic text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">
-                            <span style={{ color: hudState.pColor.primary }}>{hudState.pScore}</span>
-                            <span className="text-white/20">-</span>
-                            <span style={{ color: hudState.eColor.primary }}>{hudState.eScore}</span>
-                        </div>
+                        
+                        {/* MODE SPECIFIC DISPLAY */}
+                        {hudState.gameMode === 'SURVIVAL' ? (
+                            <div className="flex flex-col items-center">
+                                <span className="text-xs text-yellow-400 font-mono tracking-widest">WAVE</span>
+                                <span className="text-4xl font-black italic text-white drop-shadow-lg">{gameStateRef.current.wave}</span>
+                            </div>
+                        ) : hudState.gameMode === 'SANDBOX' ? (
+                            <div className="text-xs font-mono text-green-400 tracking-widest text-center">
+                                TRAINING<br/>MODE
+                            </div>
+                        ) : (
+                            <div className="flex gap-4 text-3xl font-black italic text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]">
+                                <span style={{ color: hudState.pColor.primary }}>{hudState.pScore}</span>
+                                <span className="text-white/20">-</span>
+                                <span style={{ color: hudState.eColor.primary }}>{hudState.eScore}</span>
+                            </div>
+                        )}
+                        
                      </div>
-                     <div className="text-[10px] tracking-[0.5em] text-white/40 mt-1 font-mono">VS</div>
                 </div>
 
                 {/* ENEMY HUD */}
-                <div className="w-[42%] flex flex-col items-end gap-1">
+                <div className="w-[42%] flex flex-col items-end gap-1" style={{ opacity: hudState.gameMode === 'SANDBOX' ? 0.6 : 1 }}>
                     <div className="flex items-end gap-2 mb-1 pr-4">
                         <div 
                             className="text-xs font-mono mb-1 px-2 py-0.5 border rounded"
@@ -239,7 +258,7 @@ export const HUD: React.FC<HUDProps> = ({ gameStateRef, gameActive, playerClass,
                  <div className="text-white font-mono text-sm tracking-widest mt-2 ml-2">SUPER HIT</div>
             </div>
 
-            {/* INTRO OVERLAY TEXT (READY / FIGHT) */}
+            {/* INTRO OVERLAY TEXT (READY / FIGHT / WAVE) */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                  <div ref={overlayTextRef} className="text-9xl font-black italic font-orbitron transition-all duration-200 drop-shadow-[0_0_30px_rgba(0,0,0,0.8)] opacity-0 tracking-widest">
                  </div>
