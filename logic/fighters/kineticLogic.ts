@@ -91,16 +91,17 @@ export const updateKinetic = (
              f.vx = 0;
              f.vy = 0; 
              
-             // 2. CALCULATE DAMAGES (The Formula)
-             // Damage = Base + (StoredInertia * 0.8) + (FallSpeed * 0.2)
-             // This heavily favors the Run-Up (StoredInertia).
-             const inertiaDamage = (f.specialPowerCharge || 0) * 0.8;
-             const gravityDamage = fallSpeed * 0.2;
+             // 2. CALCULATE DAMAGES (Revised Balanced Formula)
+             // Old: Base(5) + Inertia*0.8 + Gravity*0.2 (Too high)
+             // New: Base(5) + Inertia*0.5 + Gravity*0.1 (Capped at 25)
              
-             let totalDamage = 5 + inertiaDamage + gravityDamage;
+             const inertiaDamage = (f.specialPowerCharge || 0) * 0.5;
+             const gravityDamage = fallSpeed * 0.1;
              
-             // Cap damage to prevent one-shots (Max ~35)
-             totalDamage = Math.floor(Math.min(35, Math.max(8, totalDamage)));
+             let calculatedDamage = 5 + inertiaDamage + gravityDamage;
+             
+             // HARD CAP: Max 25 Damage
+             const totalDamage = Math.min(25, Math.floor(calculatedDamage));
 
              // 3. IMPACT VFX
              // Shake proportional to damage
@@ -129,6 +130,7 @@ export const updateKinetic = (
                  opponent.hitFlashTimer = 5;
                  
                  // Audio Feedback based on intensity
+                 // Since cap is 25, hitting 25 is the max crit
                  if (totalDamage >= 25) {
                      audio?.playHit(true); // CRITICAL SOUND
                      createShockwave(gameState, f.x, f.y, f.color.glow); // Extra Ring
