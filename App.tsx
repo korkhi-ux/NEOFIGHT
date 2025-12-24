@@ -144,6 +144,17 @@ export default function App() {
             background-size: 40px 40px;
             animation: grid-scroll 1s linear infinite;
         }
+        
+        @keyframes neon-pulse {
+            0%, 100% { 
+                box-shadow: 0 0 15px var(--glow-color), inset 0 0 10px rgba(255,255,255,0.1); 
+                border-color: var(--glow-color); 
+            }
+            50% { 
+                box-shadow: 0 0 35px var(--glow-color), 0 0 10px var(--glow-color), inset 0 0 20px rgba(255,255,255,0.3); 
+                border-color: #ffffff; 
+            }
+        }
 
         .neon-box {
             box-shadow: 0 0 15px rgba(0,0,0,0.8), inset 0 0 30px rgba(0,0,0,0.8);
@@ -162,10 +173,10 @@ export default function App() {
             box-shadow: 0 0 15px var(--glow-color);
         }
         .class-card.active {
-            transform: scale(1.02);
-            box-shadow: 0 0 30px var(--glow-color), inset 0 0 20px rgba(255,255,255,0.1);
-            border-color: var(--glow-color);
+            transform: scale(1.05);
             background: rgba(255,255,255,0.05);
+            animation: neon-pulse 1.5s infinite ease-in-out;
+            z-index: 20;
         }
         
         .glitch-text {
