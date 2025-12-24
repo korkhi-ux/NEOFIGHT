@@ -17,6 +17,40 @@ export const createParticles = (gameState: GameState, x: number, y: number, coun
   }
 };
 
+// NEW: Directional burst opposite to dash direction
+export const createDashBurst = (gameState: GameState, x: number, y: number, facing: number, color: string) => {
+    for(let i=0; i<12; i++) {
+        const angle = Math.atan2((Math.random()-0.5), -facing); // Cone opposite to facing
+        const speed = 5 + Math.random() * 8;
+        gameState.particles.push({
+            id: Math.random().toString(),
+            x: x,
+            y: y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 15 + Math.random() * 15,
+            maxLife: 30,
+            color: color,
+            size: 3 + Math.random() * 4
+        });
+    }
+};
+
+// NEW: Continuous sparks at feet
+export const createDashSparks = (gameState: GameState, x: number, y: number, color: string) => {
+    gameState.particles.push({
+        id: Math.random().toString(),
+        x: x + (Math.random() - 0.5) * 20,
+        y: y,
+        vx: (Math.random() - 0.5) * 2,
+        vy: -(Math.random() * 3), // Float up slightly
+        life: 10 + Math.random() * 10,
+        maxLife: 20,
+        color: color,
+        size: 2 + Math.random() * 2
+    });
+};
+
 export const createImpact = (gameState: GameState, x: number, y: number, color: string) => {
   gameState.impacts.push({
       id: Math.random().toString(),

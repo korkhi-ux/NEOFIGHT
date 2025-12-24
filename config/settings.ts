@@ -2,7 +2,6 @@
 import { GameMode } from '../types';
 
 export const HIT_FLASH_DURATION = 2; 
-export const TRAIL_LENGTH = 3; 
 
 // Camera Dynamics
 export const MAX_ZOOM = 1.3; 

@@ -1,11 +1,12 @@
 
+
 import { 
   GROUND_Y, GRAVITY, FRICTION, AIR_RESISTANCE,
   WORLD_WIDTH, GRAPPLE_COOLDOWN
 } from '../config/physics';
 import { ATTACK_DURATIONS, ATTACK_COOLDOWN, COMBO_WINDOW, CLASS_STATS } from '../config/balance';
 import { Fighter, GameState } from '../types';
-import { createParticles } from './effectSpawners';
+import { createParticles, createShockwave } from './effectSpawners';
 import { AudioManager } from '../core/AudioManager';
 
 // Import Class Logic
@@ -47,7 +48,6 @@ export const updateFighter = (
     f.prevGrounded = f.isGrounded;
 
     // --- 1. DISPATCH CLASS SPECIFIC LOGIC ---
-    // This handles special abilities, unique states, and passive mechanics
     switch(f.classType) {
         case 'VOLT':
             updateVolt(f, gameState, freshSpecial, opponent, audio);
@@ -59,18 +59,17 @@ export const updateFighter = (
             updateSlinger(f, gameState, freshSpecial, opponent);
             break;
         case 'VORTEX':
-            updateVortex(f, gameState, freshSpecial, opponent, audio); // Updated Signature
+            updateVortex(f, gameState, freshSpecial, opponent, audio); 
             break;
     }
     
     // --- 2. COMMON ACTION LOGIC (Dash, Jump, Attack) ---
-    // Only process if specific class logic hasn't "consumed" the state (e.g., Kinetic diving)
     
     // DASH
     if (input.dash && f.dashCooldown <= 0 && !f.isDiving) {
       if (f.isGrappling) {
           f.isGrappling = false;
-          f.isGrappleAttacking = false; // Reset Slinger kick
+          f.isGrappleAttacking = false; 
           f.grapplePoint = null;
           f.grappleTargetId = null;
           f.grappleCooldownTimer = GRAPPLE_COOLDOWN;
@@ -83,18 +82,30 @@ export const updateFighter = (
       const dashDir = input.x !== 0 ? Math.sign(input.x) : f.facing;
       f.facing = dashDir as 1 | -1;
 
+      // --- VFX: DASH BURST ---
+      const centerX = f.x + f.width/2;
+      const centerY = f.y + f.height/2;
+      
+      createShockwave(gameState, centerX, centerY, f.color.glow);
+      // Added initial dash particle burst
+      createParticles(gameState, centerX, centerY, 15, f.color.glow, 8); 
+      
+      // Extreme Stretch for speed feel
+      if (f.classType === 'VORTEX') {
+          f.scaleX = 0.1; f.scaleY = 0.1;
+      } else {
+          f.scaleX = 1.7; f.scaleY = 0.4;
+      }
+
+      // Sound & Specifics
       if (f.classType === 'KINETIC') {
           gameState.shake += 5; 
           audio?.playDash();
-      }
-
-      if (f.classType === 'VORTEX') {
-          f.scaleX = 0.1; f.scaleY = 0.1;
+      } else if (f.classType === 'VORTEX') {
           audio?.playGlitch();
           f.vx = 0; f.vy = 0;
       } else {
-          if (f.classType !== 'KINETIC') audio?.playDash();
-          f.scaleX = 1.7; f.scaleY = 0.4; 
+          audio?.playDash();
       }
     }
 
@@ -102,7 +113,7 @@ export const updateFighter = (
     if (input.jump && (f.isGrounded || (f.classType === 'SLINGER' && f.isGrappling)) && !f.isDiving) {
        if (f.isGrappling) {
            f.isGrappling = false;
-           f.isGrappleAttacking = false; // Reset Slinger kick
+           f.isGrappleAttacking = false;
            f.grapplePoint = null;
            f.grappleTargetId = null;
            f.grappleCooldownTimer = GRAPPLE_COOLDOWN;
@@ -145,7 +156,7 @@ export const updateFighter = (
                 f.comboCount = 0;
             }
             f.isAttacking = true;
-            f.hasHit = false; // Reset Hit Flag
+            f.hasHit = false; 
             f.attackTimer = ATTACK_DURATIONS[f.comboCount];
             f.comboTimer = COMBO_WINDOW; 
             f.scaleX = 1.3;
@@ -167,10 +178,22 @@ export const updateFighter = (
     if (f.isDashing) {
       f.dashTimer -= timeScale;
       
+      const centerX = f.x + f.width/2;
+      const centerY = f.y + f.height/2;
+
+      // Continuous Dash Particles (per frame or every other frame)
+      if (gameState.frameCount % 2 === 0) {
+          createParticles(gameState, centerX, centerY, 2, f.color.glow, 3);
+      }
+
       if (f.classType === 'VORTEX') {
-          // Teleport Dash Logic
           f.vx = 0; f.vy = 0;
           const teleportFrame = stats.dashDuration - 5;
+          
+          if (Math.random() > 0.5) {
+               createParticles(gameState, f.x + Math.random()*f.width, f.y + Math.random()*f.height, 1, '#d946ef', 1);
+          }
+
           if (f.dashTimer <= teleportFrame && f.dashTimer > teleportFrame - timeScale) {
                f.x += f.facing * 350;
                if (f.x < 0) f.x = 0;
@@ -275,25 +298,12 @@ export const updateFighter = (
         f.rotation += (targetRot - f.rotation) * 0.2 * timeScale;
     }
 
-    // Trails
-    const isHighSpeed = Math.abs(f.vx) > 5 || f.isDashing || f.isAttacking || f.isGrappling || f.isDiving;
-    if (isHighSpeed && gameState.frameCount % (Math.ceil(2/timeScale)) === 0) {
-        f.trail.push({
-            x: f.x,
-            y: f.y,
-            scaleX: f.scaleX,
-            scaleY: f.scaleY,
-            rotation: f.rotation,
-            facing: f.facing,
-            alpha: 0.3, 
-            color: f.color.glow
-        });
+    // Trail Update
+    if (gameState.frameCount % 2 === 0) {
+        f.trail.push({x: f.x, y: f.y});
+        if (f.trail.length > 10) f.trail.shift();
     }
-    for (let i = f.trail.length - 1; i >= 0; i--) {
-        f.trail[i].alpha -= 0.1 * timeScale;
-        if (f.trail[i].alpha <= 0) f.trail.splice(i, 1);
-    }
-    
+
     // Timer Cleanup
     if (f.dashCooldown > 0) f.dashCooldown -= timeScale;
     if (f.attackCooldown > 0) f.attackCooldown -= timeScale;

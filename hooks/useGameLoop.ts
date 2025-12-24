@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useRef } from 'react';
 import { GameState, Fighter, FighterClass, GameMode } from '../types';
 import { COLORS } from '../config/colors';
@@ -70,7 +71,6 @@ const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClas
     lastDamageFrame: 0,
     prevVx: 0,
     prevGrounded: false,
-    trail: [],
     comboCount: 0,
     comboTimer: 0,
     hitFlashTimer: 0,
@@ -82,7 +82,8 @@ const createFighter = (id: 'player' | 'enemy', x: number, classType: FighterClas
     scaleY: 1,
     rotation: 0,
     color: finalColor,
-    score: 0
+    score: 0,
+    trail: []
   };
 };
 

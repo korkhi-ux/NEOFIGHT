@@ -1,4 +1,5 @@
 
+
 export interface Vector {
   x: number;
   y: number;
@@ -21,17 +22,6 @@ export interface Particle {
   maxLife: number;
   color: string;
   size: number;
-}
-
-export interface TrailPoint {
-  x: number;
-  y: number;
-  scaleX: number;
-  scaleY: number;
-  rotation: number; // For tilt
-  facing: 1 | -1;
-  alpha: number; // Opacity
-  color: string;
 }
 
 export interface Shockwave {
@@ -116,6 +106,9 @@ export interface Fighter {
   // HUD
   ghostHealth: number; // For the white delayed bar
 
+  // Visuals
+  trail: Vector[];
+
   // AI Brain
   aiState?: AIState;
 
@@ -161,9 +154,6 @@ export interface Fighter {
   // Previous Frame State (for friction/landing particles)
   prevVx: number;
   prevGrounded: boolean;
-
-  // Visuals
-  trail: TrailPoint[]; // For afterimages
   
   // Combo System
   comboCount: number; // 0, 1, 2
