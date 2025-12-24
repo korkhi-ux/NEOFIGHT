@@ -62,6 +62,19 @@ export interface LensFlare {
   color: string;
 }
 
+export interface FloatingText {
+  id: string;
+  x: number;
+  y: number;
+  text: string;     // The damage amount
+  color: string;    // '#ffffff' or '#fbbf24'
+  size: number;     // 20 or 32
+  life: number;     // frames
+  vx: number;       
+  vy: number;       
+  opacity: number;
+}
+
 export interface AIState {
   mode: 'neutral' | 'aggressive' | 'defensive' | 'showoff' | 'dummy';
   actionTimer: number; // Frames to hold current decision
@@ -184,6 +197,7 @@ export interface GameState {
   shockwaves: Shockwave[];
   impacts: ImpactEffect[]; // Cross/Star lines
   flares: LensFlare[]; // Cinematic finish
+  floatingTexts: FloatingText[]; // Damage numbers
 
   shake: number; // Screen shake intensity
   shakeX: number; // Directional shake X

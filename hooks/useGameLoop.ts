@@ -13,6 +13,7 @@ import { updateCamera } from '../rendering/cameraSystem';
 import { renderGame } from '../rendering/gameRenderer';
 import { updateIntro, INTRO_DURATION } from '../logic/introSystem';
 import { DEFAULT_GAME_MODE, DEFAULT_WAVE, IS_MENU_OPEN_DEFAULT } from '../config/settings';
+import { updateFloatingTexts } from '../logic/effectSpawners';
 
 const CLASSES: FighterClass[] = ['VOLT', 'SLINGER', 'VORTEX', 'KINETIC'];
 
@@ -99,6 +100,7 @@ export const useGameLoop = (
         shockwaves: [],
         impacts: [],
         flares: [],
+        floatingTexts: [],
         shake: 0,
         shakeX: 0,
         shakeY: 0,
@@ -147,6 +149,7 @@ export const useGameLoop = (
             shockwaves: [],
             impacts: [],
             flares: [],
+            floatingTexts: [],
             // Reset Fighters
             player: createFighter('player', WORLD_WIDTH / 2 - 200, playerClass),
             enemy: createFighter('enemy', WORLD_WIDTH / 2 + 200, enemyClass)
@@ -293,6 +296,7 @@ export const useGameLoop = (
                         state.flares[i].life -= state.slowMoFactor;
                         if (state.flares[i].life <= 0) state.flares.splice(i, 1);
                     }
+                    updateFloatingTexts(state);
                 }
             }
 

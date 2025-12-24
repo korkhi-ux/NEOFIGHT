@@ -86,3 +86,40 @@ export const createLightningBolt = (gameState: GameState, x: number, y: number) 
     createShockwave(gameState, x, y, '#ffffff');
     createParticles(gameState, x, y, 10, '#ffffff', 8);
 };
+
+export const createDamageText = (gameState: GameState, x: number, y: number, damage: number) => {
+    const isHeavy = damage >= 15;
+    
+    gameState.floatingTexts.push({
+        id: Math.random().toString(),
+        x: x,
+        y: y - 50, // Start slightly above head
+        text: Math.floor(damage).toString(),
+        color: isHeavy ? '#fbbf24' : '#ffffff',
+        size: isHeavy ? 32 : 20,
+        life: 40,
+        vx: (Math.random() - 0.5) * 2,
+        vy: isHeavy ? -3 : -2,
+        opacity: 1
+    });
+};
+
+export const updateFloatingTexts = (gameState: GameState) => {
+    const timeScale = gameState.slowMoFactor;
+    
+    for (let i = gameState.floatingTexts.length - 1; i >= 0; i--) {
+        const t = gameState.floatingTexts[i];
+        t.x += t.vx * timeScale;
+        t.y += t.vy * timeScale;
+        t.vx *= 0.95; // Friction
+        t.life -= timeScale;
+        
+        if (t.life < 10) {
+            t.opacity = t.life / 10;
+        }
+        
+        if (t.life <= 0) {
+            gameState.floatingTexts.splice(i, 1);
+        }
+    }
+};

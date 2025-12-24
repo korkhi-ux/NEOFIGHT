@@ -70,6 +70,25 @@ export const renderGame = (
     // World Effects
     drawEffects(ctx, gameState, width, height, audio);
 
+    // Floating Damage Texts
+    if (gameState.floatingTexts.length > 0) {
+        gameState.floatingTexts.forEach(t => {
+            ctx.save();
+            ctx.font = `bold ${t.size}px "Orbitron", sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.globalAlpha = t.opacity;
+            ctx.fillStyle = t.color;
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 3;
+            ctx.shadowColor = 'rgba(0,0,0,0.5)';
+            ctx.shadowBlur = 4;
+            
+            ctx.strokeText(t.text, t.x, t.y);
+            ctx.fillText(t.text, t.x, t.y);
+            ctx.restore();
+        });
+    }
+
     // Screen Space Effects (Pop Camera)
     if (Math.abs(player.vx) > 10 || player.isDashing) {
          ctx.restore(); 

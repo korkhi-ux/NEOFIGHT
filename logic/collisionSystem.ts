@@ -3,7 +3,7 @@ import { ATTACK_RANGE, ATTACK_DURATIONS, ATTACK_DAMAGES, ATTACK_KNOCKBACKS, CLAS
 import { HIT_FLASH_DURATION } from '../config/settings';
 import { Fighter, GameState } from '../types';
 import { AudioManager } from '../core/AudioManager';
-import { createImpact, createParticles, createShockwave, createFlare } from './effectSpawners';
+import { createImpact, createParticles, createShockwave, createFlare, createDamageText } from './effectSpawners';
 
 // --- CENTRALIZED DEATH LOGIC (THE ARBITER) ---
 const triggerDeath = (
@@ -194,6 +194,11 @@ const handleHit = (
     defender.health -= finalDamage;
     defender.vx = attacker.facing * knockback;
     defender.vy = verticalKnock;
+
+    // --- DAMAGE TEXT VISUAL (SANDBOX ONLY) ---
+    if (gameState.gameMode === 'SANDBOX') {
+        createDamageText(gameState, defender.x + defender.width/2, defender.y, finalDamage);
+    }
     
     defender.scaleX = 0.5;
     defender.scaleY = 1.5;
